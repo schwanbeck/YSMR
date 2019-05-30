@@ -223,6 +223,8 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
     else:
         file_size = 0
     if file_size < max_size:
+        if 0 < file_size:  # if the file already contains lines, check if we start on an empty line
+            logfile_padding(path)  # or pad it with empty lines
         return path
     base_path, file_name = os.path.split(path)
     old_paths = find_paths(base_path=base_path, extension='{}.*'.format(file_name), recursive=False)
@@ -590,6 +592,21 @@ def get_data(csv_file_path, dtype=None):
         return None
     logger.debug('Done reading {} into data frame'.format(csv_file_path))
     return data
+
+
+def logfile_padding(logfile, breaker=0):
+    with open(logfile, 'r+') as file:
+        for line in file:
+            pass  # get to last line
+        if line:
+            if line not in {'\n', '\r', '\r\n'}:  # check if line contains a newline character
+                file.write('\n')
+            else:
+                return
+        else:
+            return
+    if breaker < 2:  # so we don't accidentally fill the file with empty lines if anything goes wrong
+        logfile_padding(logfile, breaker=breaker + 1)
 
 
 def _mkdir(new_directory):
