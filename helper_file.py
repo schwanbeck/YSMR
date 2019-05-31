@@ -12,6 +12,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 details. You should have received a copy of the GNU General Public License along with YSMR. If
 not, see <http://www.gnu.org/licenses/>.
 """
+
 import configparser
 import logging
 import os
@@ -108,6 +109,7 @@ def create_configs():
         'frame width': 1228,
         'minimal frame count': 600,
         'threshold offset for detection': 5,
+        'stop on error': True,
         'video extension': '.mp4',
         'use default extensions (.avi, .mp4, .mov)': True,
         'white bacteria on dark background': True,
@@ -229,13 +231,13 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
         return path
     base_path, file_name = os.path.split(path)
     old_paths = find_paths(base_path=base_path, extension='{}.*'.format(file_name), recursive=False)
-    if old_paths:
+    if old_paths:  # rename old files from .log.1 to .log.9; delete otherwise
         old_paths = sorted(old_paths, reverse=True, key=lambda x: int(x[-1]))
         counts = [int(count[-1]) for count in old_paths]
-        if not counts[-1] > 1:
+        if not counts[-1] > 1:  # if smallest number isn't 1, we can stop
             max_idx = [1]
             max_idx.extend([s - t for s, t in zip(counts[:-1], counts[1:])])
-            max_idx = np.array(max_idx).argmax()
+            max_idx = np.array(max_idx).argmax()  # look for a gap in the numbering
             for old_count, old_path in zip(counts[max_idx:], old_paths[max_idx:]):
                 try:
                     if old_count == 9:
@@ -286,7 +288,7 @@ def different_tracks(data, column='TRACK_ID'):
     # by comparing every element with the previous one
     changes = np.where(track_id[:-1] != track_id[1:])[0]
     changes = changes.tolist()  # convert to list for manipulation
-    starts = [0]  # Initialise starts - track 0 starts at index 0 obviously
+    starts = [0]  # Initialise starts; track 0 starts at index 0 obviously
     starts.extend([item + 1 for item in changes])  # others start at stop + 1
     changes.append(data.index.max())  # Append last stop to list of stops
     return starts, changes
@@ -424,6 +426,7 @@ def get_configs(first_try=True):
             'frame_width': video_settings.getint('frame width'),
             'min_frame_count': video_settings.getint('minimal frame count'),
             'threshold_offset': video_settings.getint('threshold offset for detection'),
+            'stop_on_error': video_settings.getboolean('stop on error'),
             'video_extension': video_settings.get('video extension'),
             'use_default_extensions':
                 video_settings.getboolean('use default extensions (.avi, .mp4, .mov)', fallback=True),

@@ -143,14 +143,15 @@ def track_bacteria(curr_path, settings_dicts=None):
         # if curr_frame_count < skip_frames:
         #     continue  # skip frame/jump back to start
         # uMatframe = cv2.UMat(frame)
-        if not ret and frame_count == curr_frame_count >= video['min_frame_count']:  # Stop conditions
+        if not ret and (frame_count == curr_frame_count + 1 or  # some file formats skip one frame
+                        frame_count == curr_frame_count) and frame_count >= video['min_frame_count']:  # Stop conditions
             # If a frame could not be retrieved and the minimum frame nr. has been reached
             logger_tb.info('Frames from file {} read.'.format(filename))
             break
         elif not ret:
             logger_tb.critical('Error during cap.read() with file {}'.format(curr_path))
-            # Something must've happened
-            error_during_read = True
+            # Something must've happened, user decides if to proceed
+            error_during_read = video['stop_on_error']
             break
 
         # if frame_height is None or frame_width is None:  # Set image dimensions
@@ -187,7 +188,7 @@ def track_bacteria(curr_path, settings_dicts=None):
             if curr_frame_count == video['min_frame_count']:
                 logger_tb.debug('Background threshold level: {} (of 255), '
                                 'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
-                    curr_threshold, mean.item(), stddev.item(), video['threshold_offset']))
+                                 curr_threshold, mean.item(), stddev.item(), video['threshold_offset']))
         # UMat: should utilise graphics card; tends to slow down the whole thing a lot
         # Presumably because a) my graphics card is rubbish, b) the conversion takes some time,
         # c) subsequent calculations aren't exactly witchcraft, d) all of the above
@@ -212,7 +213,7 @@ def track_bacteria(curr_path, settings_dicts=None):
         # thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 1)
 
         if test and video['show_videos']:  # display individual conversion steps to see which one fucks up
-            # @todo: select extra display in test_settings
+            # @todo: select extra display in test_settings?
             # cv2.imshow('frame', frame)
             # cv2.imshow('gray', gray)
             # cv2.imshow('equ', equ)
@@ -237,7 +238,7 @@ def track_bacteria(curr_path, settings_dicts=None):
                 # at distances < 2.56 px; thereby hopefully helping miss-assignment after overlap
                 # at least that's the intention
                 rects.append(reshape_result(reichtangle, reichtangle_mean))
-                # tracker.py has been remodelled to adaptively take n dimensions
+                # tracker.py has been remodelled to adaptively take n dimensions for distance matrix
             else:
                 rects.append(reshape_result(reichtangle))
             # reshape_result(tuple_of_tuples) returns ((x, y[, *args]), (w, h, degrees_orientation))
@@ -246,7 +247,7 @@ def track_bacteria(curr_path, settings_dicts=None):
                 box = np.int0(cv2.boxPoints(reichtangle))
                 cv2.drawContours(frame, [box], -1, (255, 0, 0), 0)
 
-        objects, wh_degrees = ct.update(rects)  # Calls centroidtracker.update() from tracker.py
+        objects, wh_degrees = ct.update(rects)  # Calls CentroidTracker.update() from tracker.py
 
         for index, (objectID, centroid) in enumerate(objects.items()):  # object.items() loop
             # Follow the KISS principle (fancy smoother option is surely available, but this works):
@@ -254,9 +255,6 @@ def track_bacteria(curr_path, settings_dicts=None):
             coords.append((curr_frame_count, objectID, centroid, wh_degrees[objectID]))
 
             # draw both the ID of the object and the center point
-            # curr_bac = objectID
-            # change to specific value to visualise only a specific bacterium
-
             if video['show_videos'] or video['save_video']:  # and objectID == curr_bac:
                 text = '{}'.format(objectID)
                 # Display object ID:
@@ -342,7 +340,7 @@ def track_bacteria(curr_path, settings_dicts=None):
     ))
 
     if error_during_read:
-        logger_tb.critical('Error during read of file {}, stopping before evaluation.'.format(curr_path))
+        logger_tb.critical('Error during read, stopping before evaluation. File: {}'.format(curr_path))
         return None
     else:
         if eval_set['evaluate_files']:
@@ -640,7 +638,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     if track['min_px'] >= track['max_px']:
         logger.critical('Minimal area exclusion in px^2 larger or equal to maximum; will not be able to find tracks. '
                         'Please update tracking.ini. Min: {}, max: {}'.format(  # makes no sense to continue
-            track['min_px'], track['max_px']))
+                         track['min_px'], track['max_px']))
         return None
     if frame_width is None or frame_height is None:
         logger.debug('Retrieving frame width/height from tracking.ini.')
@@ -666,7 +664,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     if df.shape[0] < track['min_size']:
         logger.critical('File is empty/of insufficient length before initial clean-up. '
                         'Minimal size: {}, length: {}, path: {}'.format(
-            track['min_size'], df.shape[0], path_to_file))
+                         track['min_size'], df.shape[0], path_to_file))
         return None
     _, track_change = different_tracks(df)  # different_tracks returns [starts], [stops]
     initial_length, initial_size = (len(track_change), df.shape[0])
