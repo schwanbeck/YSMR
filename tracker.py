@@ -3,6 +3,7 @@
 Copyright 2019 Adrian Rosebrock (adrian@pyimagesearch.com)
 https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/
 ##Explanation
+This file contains the nearest distance tracker code used by YSMR during video analysis.
 This file is part of YSMR. YSMR is free software: you can distribute it and/or modify
 it under the terms of the GNU General Public License as published by the Free Software Foundation,
 either version 3 of the License, or (at your option) any later version. YSMR is distributed in

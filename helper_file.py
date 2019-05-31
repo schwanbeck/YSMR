@@ -3,6 +3,7 @@
 Copyright 2019 Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
 https://github.com/schwanbeck/YSMR
 ##Explanation
+This file contains various functions used by YSMR.
 This file is part of YSMR. YSMR is free software: you can distribute it and/or modify
 it under the terms of the GNU General Public License as published by the Free Software Foundation,
 either version 3 of the License, or (at your option) any later version. YSMR is distributed in
