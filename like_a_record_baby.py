@@ -221,8 +221,17 @@ def track_bacteria(curr_path, settings_dicts=None):
             # cv2.imshow('thresh', thresh)
             pass
 
-        _, contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # returns image, contours, hierarchy (cv2 v.3.4.5.20); we just care about contours
+        # or returns contours, hierarchy (cv2 v4+)
+        if len(contours) == 3:
+            contours = contours[1]
+        elif len(contours) == 2:
+            contours = contours[0]
+        else:
+            logger_tb.critical('Unexpected return value from cv2.findContours(); tuple must have length of 2 or 3. '
+                               'Check openCV documentation for cv2.findContours().')
+            return None
 
         rects = []  # List of bounding rectangles in the current thresholded frame
         for contour in contours:
