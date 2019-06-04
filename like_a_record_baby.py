@@ -19,7 +19,7 @@ import sys
 from datetime import datetime
 from time import strftime, localtime, strptime
 
-import cv2  # opencv-contrib-python v3.4.5.20; needs numpy
+import cv2
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -46,44 +46,44 @@ from tracker import CentroidTracker
 
 
 def track_bacteria(curr_path, settings_dicts=None):
-    logger_tb = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ei').getChild(__name__)
     t_one_track_bacteria = datetime.now()
     if settings_dicts is None:
         settings_dicts = get_configs()
     if settings_dicts is not None:
         default, video, _, eval_set, test = settings_dicts
     else:
-        logger_tb.critical('No settings provided / could not get settings for track_bacteria().')
+        logger.critical('No settings provided / could not get settings for track_bacteria().')
         return None
     # We have to set the log level again due to multiprocessing
     get_loggers(log_level=default['logging_level'],
                 logfile_name=default['log_file'],
                 use_short=default['short_sys_log'])
     # Log some general stuff
-    logger_tb.debug('Starting process - module: {} PID: {}'.format(__name__, os.getpid()))
+    logger.debug('Starting process - module: {} PID: {}'.format(__name__, os.getpid()))
     # Check for errors
     if not os.path.isfile(curr_path):
-        logger_tb.critical('File {} does not exist'.format(curr_path))
+        logger.critical('File {} does not exist'.format(curr_path))
         return None
     try:
         cap = cv2.VideoCapture(curr_path)
     except (IOError, OSError) as io_error:
-        logger_tb.exception('Cannot open file {} due to error: {}'.format(curr_path, io_error))
+        logger.exception('Cannot open file {} due to error: {}'.format(curr_path, io_error))
         return None
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if frame_count < video['min_frame_count']:
-        logger_tb.warning('File {} too short; file was skipped.'.format(curr_path))
+        logger.warning('File {} too short; file was skipped.'.format(curr_path))
         return None
     try:
         fps_of_file = cap.get(cv2.CAP_PROP_FPS)
         if default['verbose'] or fps_of_file != video['frames_per_second']:
-            logger_tb.info('fps of file: {}'.format(fps_of_file))
+            logger.info('fps of file: {}'.format(fps_of_file))
     except Exception as ex:
         template = 'An exception of type {0} occurred while accessing fps from file {2}. Arguments:\n{1!r}'
-        logger_tb.exception(template.format(type(ex).__name__, ex.args, curr_path))
+        logger.exception(template.format(type(ex).__name__, ex.args, curr_path))
         if video['frames_per_second'] <= 0:
-            logger_tb.critical('User defined fps unacceptable: type: {} value: {}'.format(
+            logger.critical('User defined fps unacceptable: type: {} value: {}'.format(
                 type(video['frames_per_second']), video['frames_per_second']))
             return None
         else:
@@ -93,7 +93,7 @@ def track_bacteria(curr_path, settings_dicts=None):
 
     pathname, filename = os.path.split(curr_path)
     list_name = save_list(get_name=True, file_path=pathname, filename=filename)
-    logger_tb.info('Starting with file {}'.format(curr_path))
+    logger.info('Starting with file {}'.format(curr_path))
 
     # Set initial values; initialise result list
     old_list = save_list(file_path=pathname, filename=filename,
@@ -116,18 +116,15 @@ def track_bacteria(curr_path, settings_dicts=None):
     (frame_height, frame_width) = (int(cap.get(4)),
                                    int(cap.get(3)))  # Image dimensions
     if default['verbose']:
-        logger_tb.debug('Frame height: {}, width: {}'.format(frame_height, frame_width))
+        logger.debug('Frame height: {}, width: {}'.format(frame_height, frame_width))
 
-    # No longer used blurr/filter
+    # Background removal:
     # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
-    # fourcc = cv.VideoWriter_fourcc(*'X264')  # XVID MJPG etc
-    # Doesn't work with cv2, because why should it? It'd make sense otherwise! Can't have that. $%§!#
-    # with open('{}/{}_output.avi'.format(pathname, filename), 'w+') as video_output_file:
-
     if video['save_video']:
-        logger_tb.info('Output file: {}/{}_output.avi'.format(pathname, filename))
-        out = cv2.VideoWriter('{}/{}_output.avi'.format(pathname, filename),
+        output_video_name = '{}/{}_output.avi'.format(pathname, filename)
+        logger.info('Output video file: {}'.format(output_video_name))
+        out = cv2.VideoWriter(output_video_name,
                               cv2.VideoWriter_fourcc(*'MJPG'),  # Codec *'MJPG'  # X264
                               fps_of_file,  # FPS
                               (frame_width, frame_height)  # Dimensions
@@ -146,17 +143,13 @@ def track_bacteria(curr_path, settings_dicts=None):
         if not ret and (frame_count == curr_frame_count + 1 or  # some file formats skip one frame
                         frame_count == curr_frame_count) and frame_count >= video['min_frame_count']:  # Stop conditions
             # If a frame could not be retrieved and the minimum frame nr. has been reached
-            logger_tb.info('Frames from file {} read.'.format(filename))
+            logger.info('Frames from file {} read.'.format(filename))
             break
         elif not ret:
-            logger_tb.critical('Error during cap.read() with file {}'.format(curr_path))
+            logger.critical('Error during cap.read() with file {}'.format(curr_path))
             # Something must've happened, user decides if to proceed
             error_during_read = video['stop_on_error']
             break
-
-        # if frame_height is None or frame_width is None:  # Set image dimensions
-        #     (frame_height, frame_width) = frame.shape[:2]
-        #     # frame.shape returns rows (height), columns (width), and, if applicable, channels
 
         '''
         SORT THIS SHIT OUT  >  shit sorted, mebbeh?
@@ -166,10 +159,9 @@ def track_bacteria(curr_path, settings_dicts=None):
         gray -> blurred -> Threshold (standard?)
         '''
         # frame = imutils.resize(frame, width=600)  # Loss of information; harder to detect stuff, gain of speed?
-        # Not necessary and gain in speed doesn't outweigh loss of precision
+        # Resizing not necessary and gain in speed doesn't outweigh loss of precision
 
         gray = cv2.cvtColor(frame, video['color_filter'])  # Convert to gray scale
-        # gray_2 = cv2.cvtColor(frame, colour_filter)
 
         if curr_frame_count <= video['min_frame_count']:  # set threshold adaptively  + skip_frames
             mean, stddev = cv2.meanStdDev(gray)
@@ -186,21 +178,22 @@ def track_bacteria(curr_path, settings_dicts=None):
             # stop fiddling with brightness during recording
             # Usually stable after ~2 frames
             if curr_frame_count == video['min_frame_count']:
-                logger_tb.debug('Background threshold level: {} (of 255), '
-                                'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
-                                 curr_threshold, mean.item(), stddev.item(), video['threshold_offset']))
-        # UMat: should utilise graphics card; tends to slow down the whole thing a lot
-        # Presumably because a) my graphics card is rubbish, b) the conversion takes some time,
-        # c) subsequent calculations aren't exactly witchcraft, d) all of the above
-        # gray = cv2.UMat(gray)
-        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-        '''
+                logger.debug('Background threshold level: {} (of 255), '
+                             'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
+                              curr_threshold, mean.item(), stddev.item(), video['threshold_offset']))
         # various other tries to optimise threshold:
         # blurred = cv2.bilateralFilter(gray, 3, 75, 75)
         # equ = clahe.apply(gray)  # uncomment clahe above; background removal
         # blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         # blurred = cv2.medianBlur(gray, 5)
-        '''
+
+        # UMat: should utilise graphics card; tends to slow down the whole thing a lot
+        # Presumably because a) my graphics card is rubbish, b) the conversion takes too much time,
+        # c) subsequent calculations aren't exactly witchcraft, d) all of the above
+        # gray = cv2.UMat(gray)
+
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+
         if video['white_bacteria_on_dark_background']:
             # All pixels above curr_threshold are set to 255 (white); others are set to 0
             thresh = cv2.threshold(blurred, curr_threshold, 255, cv2.THRESH_BINARY)[1]
@@ -212,14 +205,12 @@ def track_bacteria(curr_path, settings_dicts=None):
         # thresh = cv2.threshold(blurred, 90, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
         # thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 1)
 
-        if test and video['show_videos']:  # display individual conversion steps to see which one fucks up
-            # @todo: select extra display in test_settings?
+        if test['debugging'] and video['show_videos']:  # display individual conversion steps to see which one fucks up
             # cv2.imshow('frame', frame)
             # cv2.imshow('gray', gray)
             # cv2.imshow('equ', equ)
-            # cv2.imshow('blurred', blurred)
-            # cv2.imshow('thresh', thresh)
-            pass
+            cv2.imshow('blurred', blurred)
+            cv2.imshow('threshold', thresh)
 
         contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # returns image, contours, hierarchy (cv2 v.3.4.5.20); we just care about contours
@@ -229,8 +220,8 @@ def track_bacteria(curr_path, settings_dicts=None):
         elif len(contours) == 2:
             contours = contours[0]
         else:
-            logger_tb.critical('Unexpected return value from cv2.findContours(); tuple must have length of 2 or 3. '
-                               'Check openCV documentation for cv2.findContours().')
+            logger.critical('Unexpected return value from cv2.findContours(); tuple must have length of 2 or 3. '
+                            'Check openCV documentation for cv2.findContours().')
             return None
 
         rects = []  # List of bounding rectangles in the current thresholded frame
@@ -250,7 +241,7 @@ def track_bacteria(curr_path, settings_dicts=None):
                 # tracker.py has been remodelled to adaptively take n dimensions for distance matrix
             else:
                 rects.append(reshape_result(reichtangle))
-            # reshape_result(tuple_of_tuples) returns ((x, y[, *args]), (w, h, degrees_orientation))
+                # reshape_result(tuple_of_tuples) returns ((x, y[, *args]), (w, h, degrees_orientation))
 
             if video['show_videos'] or video['save_video']:  # Display bounding boxes
                 box = np.int0(cv2.boxPoints(reichtangle))
@@ -275,7 +266,7 @@ def track_bacteria(curr_path, settings_dicts=None):
         # Frame is finished, video can be saved
         if video['save_video']:
             cv2.putText(frame,  # image
-                        '{}'.format(filename[13:].replace('_', ' ')),  # text
+                        '{}'.format(filename[:].replace('_', ' ')),  # text
                         (20, 20),  # xy coordinates
                         cv2.FONT_HERSHEY_SIMPLEX,  # font
                         0.7,  # text size
@@ -309,7 +300,7 @@ def track_bacteria(curr_path, settings_dicts=None):
             cv2.imshow('{}'.format(filename), frame)  # Display the image
             if cv2.waitKey(1) & 0xFF == ord('q'):  # Interrupt display on 'q'-keypress
                 error_during_read = True
-                logger_tb.error('Processing file interrupted by user: {}'.format(curr_path))
+                logger.error('Processing file interrupted by user: {}'.format(curr_path))
                 break
         # @todo: break_time_seconds from .ini - for partial analysis?
         # break_time_seconds = 0
@@ -330,18 +321,17 @@ def track_bacteria(curr_path, settings_dicts=None):
         try:
             os.remove(list_name)
             os.rename(old_list, list_name)
-            logger_tb.info('Restoring old list: {}'.format(list_name))
+            logger.info('Restoring old list: {}'.format(list_name))
         except (OSError, FileNotFoundError) as file_removal_error:
-            logger_tb.error('An exception of type {0} occurred with path {1}. Arguments:\n{2!r}'.format(
+            logger.error('An exception of type {0} occurred with path {1}. Arguments:\n{2!r}'.format(
                 type(file_removal_error).__name__, list_name, file_removal_error.args))
         finally:
             pass
 
     last_object_id = next(reversed(objects))  # get number of last object
     df_for_eval = sort_list(file_path=list_name, save_file=not default['delete_csv_afterwards'])
-    # sort results by Object ID - takes forever, optimise?
 
-    logger_tb.info('fps: {}, objects: {}, frames: {}, csv: {}'.format(  # Display some infos
+    logger.info('fps: {}, objects: {}, frames: {}, csv: {}'.format(  # Display some infos
         '{:.2f}'.format((sum(fps_total) / curr_frame_count)).rjust(6, ' '),  # Average FPS
         '{}'.format(last_object_id + 1).rjust(6, ' '),  # Total Nr. of objects
         '{:>6} of {:>6}'.format(curr_frame_count, frame_count),  # Current frames / total frames
@@ -349,11 +339,11 @@ def track_bacteria(curr_path, settings_dicts=None):
     ))
 
     if error_during_read:
-        logger_tb.critical('Error during read, stopping before evaluation. File: {}'.format(curr_path))
+        logger.critical('Error during read, stopping before evaluation. File: {}'.format(curr_path))
         return None
     else:
         if eval_set['evaluate_files']:
-            logger_tb.info('Starting evaluation of file {}'.format(list_name))
+            logger.info('Starting evaluation of file {}'.format(list_name))
             start_it_up(path_to_files=list_name,
                         df=df_for_eval,
                         fps=fps_of_file,
@@ -363,13 +353,15 @@ def track_bacteria(curr_path, settings_dicts=None):
                         create_logger=False,
                         )
         if default['delete_csv_afterwards']:
-            logger_tb.info('Removing .csv file: {}'.format(list_name))
+            logger.info('Removing .csv file: {}'.format(list_name))
             try:
                 os.remove(list_name)
-            except OSError:
-                logger_tb.warning('Could not delete file {}'.format(list_name))
+            except (OSError, FileNotFoundError):
+                logger.warning('Could not delete file {}'.format(list_name))
+            finally:
+                pass
         # If everything went well, hand over the list name to the next process
-        logger_tb.info('Finished process - module: {} PID: {}, elapsed time: {}'.format(
+        logger.info('Finished process - module: {} PID: {}, elapsed time: {}'.format(
             __name__,
             os.getpid(),
             elapsed_time(t_one_track_bacteria))
@@ -951,8 +943,8 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
                   turn_percent_series / motile_total_series,
                   0)), index=time_series.index)
     name_of_columns = ['Turn Points (TP/s)',  # 0
-                       'Distance (µm)',  # 1
-                       'Speed (µm/s)',  # 2
+                       'Distance (\u00B5m)',  # 1
+                       'Speed (\u00B5m/s)',  # 2
                        'Time (s)',  # 3
                        'Displacement',  # 4
                        '% motile',  # 5
@@ -1047,7 +1039,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # sort df_stats_seaborne by generated dict key:value pairs (in order of cut_off_list)
     df_stats_seaborne = df_stats_seaborne.iloc[df_stats_seaborne['Categories'].map(categories).sort_values().index]
 
-    distance_min = df_stats[name_of_columns[1]].min()  # 'Distance (µm)',  # 1
+    distance_min = df_stats[name_of_columns[1]].min()  # 'Distance (micrometre)',  # 1
     distance_max = df_stats[name_of_columns[1]].max()
     df['distance_colour'] = df.groupby('TRACK_ID')['travelled_dist'].transform('sum') - distance_min
     df['distance_colour'] = df['distance_colour'] / df['distance_colour'].max()
@@ -1166,7 +1158,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             colorbar_map = plt.cm.gist_rainbow
             norm = mpl.colors.Normalize(vmin=distance_min, vmax=distance_max)
             cb = mpl.colorbar.ColorbarBase(all_plots[plot_idx], cmap=colorbar_map, norm=norm, )
-            cb.set_label('Distance in µm')
+            cb.set_label('Distance in \u00B5m')
 
         elif plot_idx == 3:
             all_plots[plot_idx].grid(axis='y', which='major',

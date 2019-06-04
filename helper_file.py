@@ -215,7 +215,7 @@ def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=20, time_
             _config.set('TEST_SETTINGS', 'last backup', str(now_utc))
             with open('tracking.ini', 'w') as configfile:
                 _config.write(configfile)
-            logger.debug('Previous backup set to {} (lokal time: {})'.format(now_utc, now))
+            logger.debug('Previous backup set to {} (local time: {})'.format(now_utc, now))
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
@@ -618,7 +618,12 @@ def _mkdir(new_directory):
         - already exists, silently complete
         - regular file in the way, raise an exception
         - parent directory(ies) does not exist, make them as well
+        Source:
+        Originally published: 2001-10-18 10:53:13
+        Last updated: 2009-12-18 15:33:58
+        Author: Trent Mick
         - https://code.activestate.com/recipes/82465-a-friendly-mkdir/
+        Accessed last 2019-06-04 13:37:00,101
     """
     if os.path.isdir(new_directory):
         pass

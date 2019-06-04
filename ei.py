@@ -19,7 +19,7 @@ import sys
 from datetime import datetime
 from time import sleep
 
-import cv2  # tested with opencv-contrib-python v3.4.5.20; needs numpy
+import cv2  # needs numpy
 import numpy as np  # needed by cv2; otherwise crashes/freezes without comment
 
 from helper_file import (
