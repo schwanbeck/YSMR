@@ -1078,24 +1078,42 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             lw=0,
         )
         # display tracks
-        colours = get_colour_map(len(track_change))
-        grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y']
+        # colours = get_colour_map(len(track_change))
+        # grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y']
+        # for name, group in grouped_df:
+        #     plt.scatter(
+        #         group.POSITION_X,
+        #         group.POSITION_Y,
+        #         marker='.',
+        #         label=name,
+        #         color=next(colours),
+        #         s=1,
+        #         lw=0,
+        #     )
+        grouped_df = df.loc[
+                     :, ['TRACK_ID', 'distance_colour', 'POSITION_X', 'POSITION_Y']
+                     ].sort_values(['distance_colour'], ascending=False).groupby(
+            'TRACK_ID', sort=False)['POSITION_X', 'POSITION_Y', 'distance_colour']
+        # @todo: Circles indicate the mean and 90th percentile net displacements
         for name, group in grouped_df:
             plt.scatter(
                 group.POSITION_X,
                 group.POSITION_Y,
                 marker='.',
                 label=name,
-                color=next(colours),
+                c=plt.cm.gist_rainbow(group.distance_colour),
+                # vmin=distance_min,
+                # vmax=distance_max,
+                # cmap=plt.cm.gist_rainbow,
                 s=1,
                 lw=0,
             )
+        del grouped_df
         plt.title('{} Track count: {}'.format(plot_title_name, len(track_change)))
         plot_save_path = '{}{}_Bac_Run_Overview.png'.format(daily_directory, file_name)
         plt.savefig(plot_save_path, dpi=300)
         logger.info('Saving figure {}'.format(plot_save_path))
         plt.close()
-        del grouped_df
 
     f = plt.figure()
     # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
