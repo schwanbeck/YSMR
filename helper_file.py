@@ -305,7 +305,7 @@ def elapsed_time(time_one):
     return time_delta
 
 
-def find_paths(base_path=None, extension=None, minimal_age=0, maximal_age=np.inf, recursive=True):
+def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, recursive=True):
     logger = logging.getLogger('ei').getChild(__name__)
     if not os.path.exists(base_path):
         logger.critical('Path could not be found: {}'.format(base_path))
@@ -314,23 +314,20 @@ def find_paths(base_path=None, extension=None, minimal_age=0, maximal_age=np.inf
         extension = _config['VIDEO_SETTINGS'].get('extension', fallback='.mp4')
     # if extension[0] != '.' and len(extension) == 3:
     #     extension = '.{}'.format(extension)
-    if minimal_age is None:
-        minimal_age = _default.getint('time since creation in seconds', fallback=0)
-    if base_path is None:
-        base_path = 'Q:/Movies/{}{}'.format('**/*', extension)
-    else:
-        if base_path[-1] != '/':
-            base_path = '{}/'.format(base_path)
-        base_path = '{}**/*{}'.format(base_path, extension)
+    # if minimal_age is None:
+    #     minimal_age = _default.getint('time since creation in seconds', fallback=0)
+    if base_path[-1] != '/':
+        base_path = '{}/'.format(base_path)
+    base_path = '{}**/*{}'.format(base_path, extension)
     in_files = glob(base_path, recursive=recursive)
     out_files = []
     for file in in_files:
+        # Set path separators to /
         file = file.replace(os.sep, '/')
         # checks if file is young/old enough
         file_creation_date = creation_date(file)
         if file_creation_date >= 0 or minimal_age < 0:
             if maximal_age >= file_creation_date >= minimal_age:
-                # Set path separators to /
                 out_files.append(file)
         else:
             logger.warning('The file appears to be {:.2f} seconds '
@@ -338,7 +335,6 @@ def find_paths(base_path=None, extension=None, minimal_age=0, maximal_age=np.inf
                            'To circumvent this, set minimal age in tracking.ini'
                            ' to a negative value. '
                            'File: {}'.format(abs(file_creation_date), file))
-    del in_files
     return out_files
 
 
@@ -667,7 +663,7 @@ def save_list(file_path, filename, coords=None, get_name=False, first_call=False
             file.write('TRACK_ID,POSITION_T,POSITION_X,POSITION_Y,WIDTH,HEIGHT,DEGREES_ANGLE\n')  # first row
         return old_list  # return state of old_list, stop function
 
-    if coords is not None:  # Check if we actually received something
+    if coords:  # Check if we actually received something
         string_holder = ''  # Create empty string to which rows are appended
         for item in coords:
             # convert tuple first into single parts, then to .csv row

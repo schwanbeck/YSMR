@@ -949,7 +949,6 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
                        'Displacement',  # 4
                        '% motile',  # 5
                        ]
-    # things_to_plot = [name_of_columns[0], 'xy_plot', name_of_columns[2], name_of_columns[5], 'cbar']
     # Create df for statistics
     df_stats = pd.concat(
         [turn_percent_series,  # 0
@@ -1432,7 +1431,6 @@ if __name__ == '__main__':
     logger_main.debug('Logging test message')
 
     pool = mp.Pool()
-    ei_folder_time = str(strftime('%y%m%d', localtime()))
     main_files = find_paths(base_path='H:/Test/190430_Motility/test/',
                             extension='list.csv', minimal_age=0)
     main_folder_time = str(strftime('%y%m%d', localtime()))
@@ -1456,10 +1454,7 @@ if __name__ == '__main__':
             main_daily_directory = './'
         finally:
             pass
-    logger_main.info('paths: {}'.format(len(main_files)))
-    # start_it_up(ding)
-    # , time_since_creation=None, minimal_age=np.inf
-    ei_daily_directory = 'Q:/Movies/{}_WB_TEST_Result_py/'.format(ei_folder_time)
+    logger_main.info('Paths: {}'.format(len(main_files)))
 
     for d in main_files:
         pool.apply_async(start_it_up, args=(d,))
