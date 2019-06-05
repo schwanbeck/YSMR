@@ -231,6 +231,6 @@ if __name__ == '__main__':
                     logger_main.exception('Error during shutdown: {}'.format(os_shutdown_error))
             finally:
                 pass
-    logger_main.info('Elapsed time: {}\n{}\n\n'.format(elapsed_time(t_one), filler_for_logger))
+    logger_main.info('Elapsed time: {}\n{}\n'.format(elapsed_time(t_one), filler_for_logger))
     queue_listener.stop()
     sys.exit(0)
