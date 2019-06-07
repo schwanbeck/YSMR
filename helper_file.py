@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Copyright 2019 Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
 https://github.com/schwanbeck/YSMR
@@ -18,6 +20,7 @@ import logging
 import os
 import platform
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from glob import glob
@@ -57,7 +60,6 @@ def bytes_to_human_readable(number_of_bytes):
     Returns string containing bytes, rounded to 1 decimal place,
     with unit prefix as defined by SI.
     For documentation purposes only.
-    Author: Julian Schwanbeck
     """
     if number_of_bytes < 0:  # assert number_of_bytes >= 0, 'Negative bytes passed'
         return 'Negative Bytes'  # As this isn't / shouldn't be used anywhere important, this suffices
@@ -72,7 +74,17 @@ def bytes_to_human_readable(number_of_bytes):
 
 def create_configs():
     logger = logging.getLogger('ei').getChild(__name__)
-    logger.warning('tracking.ini was reset to default values')
+    configfilepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
+    _config['BASIC VIDEO FILE SETTINGS'] = {
+        'frames per second': 30,
+        'pixel per micrometre': 1.41888781,
+        'frame height': 922,
+        'frame width': 1228,
+        'white bacteria on dark background': True,
+    }
+
+    # _config[''] = {}
+
     _config['DEFAULT_SETTINGS'] = {
         'user input': True,
         'shut down after analysis': False,
@@ -152,10 +164,31 @@ def create_configs():
         'last backup': '2019-03-29 13:37:30.330330',
     }
     try:
-        with open('tracking.ini', 'w+') as configfile:
+        with open(configfilepath, 'w+') as configfile:
             _config.write(configfile)
+        logger.critical('tracking.ini was reset to default values')
     except (IOError, OSError) as configfile_error:
         logger.exception('Could not create config file: {}'.format(configfile_error))
+        return
+    try:
+        """
+        Opens text file after creation, should be correct for win/linux/mac
+        Source: Ch.Idea
+        https://stackoverflow.com/questions/434597/
+        Accessed last 2019-06-07 13:37:00,101        
+        """
+        # @todo: untested on linux & mac
+        if os.name is 'nt':  # Windows
+            # works with spaces in name whereas subprocess.call(('start', path), shell=True) does not
+            subprocess.call(('cmd /c start "" "' + configfilepath + '"'))
+        elif sys.platform.startswith('darwin'):  # Mac
+            subprocess.call(('open', configfilepath))
+        else:  # Linux
+            subprocess.call(('xdg-open', configfilepath))
+    except (subprocess.CalledProcessError, FileNotFoundError) as file_open_error:
+        logger.exception(file_open_error)
+    finally:
+        pass
 
 
 # Check tracking.ini
@@ -258,7 +291,7 @@ def creation_date(path_to_file):
     """
     Try to get the date that a file was created, falling back to when it was
     last modified if that isn't possible.
-    See for explanation/origin:
+    See for explanation/source:
     https://stackoverflow.com/a/39501288/1709587
     Accessed last 2019-03-01 13:37:00,101
     """
@@ -376,6 +409,7 @@ def get_colour_map(counts, colour_map=plt.cm.gist_rainbow):
 def get_configs(first_try=True):
     logger = logging.getLogger('ei').getChild(__name__)
     settings_dicts = None
+    # @todo: change to one dictionary
     try:
         default = _config['DEFAULT_SETTINGS']
         verbose = default.getboolean('verbose')
@@ -765,12 +799,12 @@ def sort_list(file_path=None, sort=None, df=None, save_file=True):
 if __name__ == '__main__':
     _backup(skip_check_time=False)
     create_configs()
-    d = get_configs()
-    if d is not None:
-        for dic in d:
-            print('{}'.format('#' * 50))
-            for key in dic:
-                print(key, ': ', dic[key])
-                if dic[key] is None:
-                    print('MISSING: {}'.format(key))
+    # d = get_configs()
+    # if d is not None:
+    #     for dic in d:
+    #         print('{}'.format('#' * 50))
+    #         for key in dic:
+    #             print(key, ': ', dic[key])
+    #             if dic[key] is None:
+    #                 print('MISSING: {}'.format(key))
     sys.exit()

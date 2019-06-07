@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Copyright 2019 Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
 https://github.com/schwanbeck/YSMR

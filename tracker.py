@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Copyright 2019 Adrian Rosebrock (adrian@pyimagesearch.com)
 https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/
