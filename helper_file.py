@@ -28,6 +28,7 @@ from itertools import cycle as cycle
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from tkinter import filedialog, Tk
+from time import sleep
 
 import cv2
 import matplotlib.pyplot as plt
@@ -75,15 +76,24 @@ def bytes_to_human_readable(number_of_bytes):
 def create_configs():
     logger = logging.getLogger('ei').getChild(__name__)
     configfilepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
-    _config['BASIC VIDEO FILE SETTINGS'] = {
+    '''
+    _config['BASIC_RECORDING_SETTINGS'] = {
+        'video extension': '.mp4',
         'frames per second': 30,
         'pixel per micrometre': 1.41888781,
         'frame height': 922,
         'frame width': 1228,
         'white bacteria on dark background': True,
+        'rod shaped bacteria': True,
     }
 
-    # _config[''] = {}
+    _config['TRACK_DATA_ANALYSIS_SETTINGS'] = {
+
+    }
+
+    _config['RESULTS_SETTING'] = {
+
+    }
 
     _config['DEFAULT_SETTINGS'] = {
         'user input': True,
@@ -115,58 +125,154 @@ def create_configs():
     # _config['DETECTION_SETTINGS'] = {}
 
     _config['VIDEO_SETTINGS'] = {
-        'frames per second': 30,
-        'pixel per micrometre': 1.41888781,
-        'frame height': 922,
-        'frame width': 1228,
+        'frames per second': 30,  # @todo: moved to basic
+        'pixel per micrometre': 1.41888781,  # @todo: moved to basic
+        'frame height': 922,  # @todo: moved to basic
+        'frame width': 1228,  # @todo: moved to basic
         'minimal frame count': 600,
         'threshold offset for detection': 5,
         'stop on error': True,
-        'video extension': '.mp4',
+        'video extension': '.mp4',  # @todo: moved to basic
         'use default extensions (.avi, .mp4, .mov)': True,
-        'white bacteria on dark background': True,
+        'white bacteria on dark background': True,  # @todo: moved to basic
         'include luminosity in tracking calculation': False,
         'show videos': False,
         'save video': False,
-        'set color filter': False,
         'color filter': 'COLOR_BGR2GRAY',
     }
+
     _config['TRACK_SELECTION'] = {
-        'size outliers lower end in px': 2,
-        'size outliers upper end in px': 50,
+        'size outliers lower end in px': 2,  # @todo: moved to TRACK_DATA_ANALYSIS
+        'size outliers upper end in px': 50,  # @todo: moved to TRACK_DATA_ANALYSIS
         'exclude measurement when above x times average area': 1.5,
-        'minimal length in seconds': 20,
+        'minimal length in seconds': 20,  # @todo: moved to TRACK_DATA_ANALYSIS
         'maximal consecutive holes': 5,
         'maximal empty frames in %': 5,
         'percent quantiles excluded area': 10,
         'try to omit motility outliers': True,
         'stop excluding motility outliers if total count above percent (0 for off)': 5,
-        'average width/height ratio min.': 0.125,
-        'average width/height ratio max.': 0.67,
+        'rod average width/height ratio min.': 0.125,
+        'rod average width/height ratio max.': 0.67,
+        'coccoid average width/height ratio min.': 0.8,
+        'coccoid average width/height ratio max.': 1.0,
         'percent of screen edges to exclude': 5,
         'maximal recursion depth (0 is off)': 960,
     }
+
     _config['EVALUATION_SETTINGS'] = {
         'evaluate files after analysis': True,
         'show large plots': False,
-        'limit track length to seconds (0 is off)': 20,
+        'limit track length to seconds (0 is off)': 20,  # @todo: moved to TRACK_DATA_ANALYSIS
         'limit track length exactly': False,
-        'compare angle between n frames': 10,
-        'min. angle in degrees for turning point': 30,
+        'compare angle between n frames': 10,  # @todo: change to 1/3 s taken from fps
+        'min. angle in degrees for turning point': 30,  # @todo: moved to TRACK_DATA_ANALYSIS
     }
     _config.set('EVALUATION_SETTINGS',
                 '# Limit track length: 0 for off; will otherwise take set frames for analysis, '
                 'or maximum track length, whichever is shorter.')
+
     _config['TEST_SETTINGS'] = {
         'debugging': False,
         'path to test video': 'Q:/test_video.avi',
         'path to test .csv': 'Q:/test_list.csv',
         'last backup': '2019-03-29 13:37:30.330330',
     }
+    '''
+    _config['BASIC RECORDING SETTINGS'] = {
+        'video extension': '.mp4',
+        'pixel per micrometre': 1.41888781,
+        'frames per second': 30,
+        'frame height': 922,
+        'frame width': 1228,
+        'white bacteria on dark background': True,
+        'rod shaped bacteria': True,  # NEW
+        'threshold offset for detection': 5,
+    }
+
+    _config['BASIC TRACK DATA ANALYSIS SETTINGS'] = {
+        'minimal length in seconds': 20,
+        'limit track length to x seconds': 20,  # __RENAMED__
+        'minimal angle in degrees for turning point': 30,  # __RENAMED__
+        'extreme size outliers lower end in px': 2,
+        'extreme size outliers upper end in px': 50,
+    }
+
+    _config['DISPLAY SETTINGS'] = {
+        'user input': True,
+        'select files': True,
+        'display video analysis': False,  # __RENAMED__
+        'save video': False,
+    }
+
+    _config['RESULTS SETTINGS'] = {
+        'evaluate files after analysis': True,  # evaluate files after analysis -> done via plot image selection
+        'rename previous result .csv': False,
+        'delete .csv file after analysis': True,
+        'store processed .csv file': False,  # NEW
+        'store generated statistical .csv file': False,  # NEW
+        'save large plots': False,  # __RENAMED__
+        'save rose plot': True,  # NEW
+        'save time violin plot': True,  # NEW
+        'save acr violin plot': False,  # NEW
+        'save distance violin plot': True,  # NEW
+        'save turning point violin plot': True,  # NEW
+        'save speed violin plot': True,  # NEW
+        # @todo: group split selector / group split unit for violin plots
+    }
+
+    _config['LOGGING SETTINGS'] = {
+        'log to file': True,  # NEW
+        'log file path': './logfile.log',
+        'shorten displayed logging output': False,
+        'shorten logfile logging output': False,  # NEW
+        'set logging level (debug/info/warning/critical)': 'debug',
+        'verbose': False,
+    }
+
+    _config['ADVANCED VIDEO SETTINGS'] = {
+        'use default extensions (.avi, .mp4, .mov)': True,
+        'include luminosity in tracking calculation': False,
+        'color filter': 'COLOR_BGR2GRAY',
+        'maximal video file age (infinite or seconds)': 'infinite',
+        'minimal video file age in seconds': 0,
+        'minimal frame count': 600,
+        'stop evaluation on error': True,  # __RENAMED__
+        'list save length interval': 10000,
+    }
+
+    _config['ADVANCED TRACK DATA ANALYSIS SETTINGS'] = {
+        'maximal consecutive holes': 5,
+        'maximal empty frames in %': 5,
+        'percent quantiles excluded area': 10,
+        'try to omit motility outliers': True,
+        'stop excluding motility outliers if total count above percent (0 for off)': 5,
+        'exclude measurement when above x times average area': 1.5,
+        'rod average width/height ratio min.': 0.125,
+        'rod average width/height ratio max.': 0.67,
+        'coccoid average width/height ratio min.': 0.8,
+        'coccoid average width/height ratio max.': 1.0,
+        'percent of screen edges to exclude': 5,
+        'maximal recursion depth (0 is off)': 960,
+        'limit track length exactly': False,
+        'compare angle between n frames': 10,
+    }
+
+    _config['HOUSEKEEPING'] = {
+        'last backup': '2019-03-29 13:37:30.330330',
+        'previous directory': './',
+        'shut down after analysis': False,
+    }
+
+    _config['TEST SETTINGS'] = {
+        'debugging': False,
+        'path to test video': 'Q:/test_video.avi',
+        'path to test .csv': 'Q:/test_list.csv',
+    }
+
     try:
         with open(configfilepath, 'w+') as configfile:
             _config.write(configfile)
-        logger.critical('tracking.ini was reset to default values')
+        logger.critical('tracking.ini was reset to default values. Path: {}'.format(configfilepath))
     except (IOError, OSError) as configfile_error:
         logger.exception('Could not create config file: {}'.format(configfile_error))
         return
@@ -180,7 +286,7 @@ def create_configs():
         # @todo: untested on linux & mac
         if os.name is 'nt':  # Windows
             # works with spaces in name whereas subprocess.call(('start', path), shell=True) does not
-            subprocess.call(('cmd /c start "" "' + configfilepath + '"'))
+            subprocess.call(('cmd /c start "" "{}"'.format(configfilepath)))
         elif sys.platform.startswith('darwin'):  # Mac
             subprocess.call(('open', configfilepath))
         else:  # Linux
@@ -194,23 +300,12 @@ def create_configs():
 # Check tracking.ini
 if not os.path.isfile('tracking.ini'):  # needed by later functions
     create_configs()
-try:  # Check if all sections are present and accessible
-    _config.read('tracking.ini')
-    for _c_key in ['DEFAULT_SETTINGS', 'VIDEO_SETTINGS', 'TRACK_SELECTION', 'EVALUATION_SETTINGS', 'TEST_SETTINGS', ]:
-        _ = _config[_c_key]
-except KeyError:  # create configs anew otherwise
-    try:
-        os.rename('tracking.ini', '{}_tracking.ini.old'.format(datetime.now().strftime('%y%m%d%H%M%S')))
-    finally:
-        pass
-    create_configs()
-    _config.read('tracking.ini')
-_default = _config['DEFAULT_SETTINGS']
+_config.read('tracking.ini')
 
 
 def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=20, time_delta_min=0):
     logger = logging.getLogger('ei').getChild(__name__)
-    last_backup = _config['TEST_SETTINGS'].get('last backup')
+    last_backup = _config['HOUSEKEEPING'].get('last backup')
     last_backup = datetime.strptime(last_backup, '%Y-%m-%d %H:%M:%S.%f')
     now_utc = datetime.utcnow()
     now = datetime.now()
@@ -245,7 +340,7 @@ def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=20, time_
                 error = '{2}: {0}, {1}'.format(src_name, dst_name, str(why))
                 logger.debug(error)
         if not skip_check_time:
-            _config.set('TEST_SETTINGS', 'last backup', str(now_utc))
+            _config.set('HOUSEKEEPING', 'last backup', str(now_utc))
             with open('tracking.ini', 'w') as configfile:
                 _config.write(configfile)
             logger.debug('Previous backup set to {} (local time: {})'.format(now_utc, now))
@@ -375,7 +470,7 @@ def get_base_path(rename=False, prev_dir=None):
     # @todo: get PyQT instead?
     logger = logging.getLogger('ei').getChild(__name__)
     if prev_dir is None:
-        prev_dir = _default.get('previous directory', fallback='./')
+        prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
     try:
         root = Tk()
         root.overrideredirect(1)  # hide the root window
@@ -393,7 +488,7 @@ def get_base_path(rename=False, prev_dir=None):
         logger.warning('No Path selected. ')
         return None
     if rename:
-        _config.set('DEFAULT_SETTINGS', 'previous directory', curr_path)
+        _config.set('HOUSEKEEPING', 'previous directory', curr_path)
         with open('tracking.ini', 'w') as configfile:
             _config.write(configfile)
         logger.debug('Previous directory set to {}'.format(curr_path))
@@ -406,14 +501,25 @@ def get_colour_map(counts, colour_map=plt.cm.gist_rainbow):
     return cycle(reversed([colour_map(col / counts) for col in range(0, counts + 1, 1)]))
 
 
-def get_configs(first_try=True):
+def get_configs(tracking_ini_filepath=None):
     logger = logging.getLogger('ei').getChild(__name__)
-    settings_dicts = None
+    if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
+        _config.read(tracking_ini_filepath)
+    settings_dict = None
     # @todo: change to one dictionary
     try:
-        default = _config['DEFAULT_SETTINGS']
-        verbose = default.getboolean('verbose')
-        set_log_level = default.get('set logging level (debug/info/warning/critical)')
+        basic_recording = _config['BASIC RECORDING SETTINGS']
+        basic_track = _config['BASIC TRACK DATA ANALYSIS SETTINGS']
+        display = _config['DISPLAY SETTINGS']
+        results = _config['RESULTS SETTINGS']
+        log_settings = _config['LOGGING SETTINGS']
+        adv_video = _config['ADVANCED VIDEO SETTINGS']
+        adv_track = _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
+        housekeeping = _config['HOUSEKEEPING']
+        test = _config['TEST SETTINGS']
+
+        verbose = log_settings.getboolean('verbose')
+        set_log_level = log_settings.get('set logging level (debug/info/warning/critical)')
         log_levels = {'debug': logging.DEBUG,
                       'info': logging.INFO,
                       'warning': logging.WARNING,
@@ -426,6 +532,33 @@ def get_configs(first_try=True):
                 logger.warning('Logging level passed argument: {}. '.format(set_log_level) +
                                'Argument not recognised. Logging set to debug. Accepted arguments: ' +
                                ''.join('{} '.format(format_level) for format_level in log_levels.keys()))
+        rod_shaped_bac = basic_recording.getboolean('rod shaped bacteria')
+        if rod_shaped_bac:
+            min_size_ratio = adv_track.getfloat('rod average width/height ratio min.')
+            max_size_ratio = adv_track.getfloat('rod average width/height ratio max.')
+        else:
+            min_size_ratio = adv_track.getfloat('coccoid average width/height ratio min.')
+            max_size_ratio = adv_track.getfloat('coccoid average width/height ratio max.')
+        colour_filter = adv_video.get('color filter')
+        if colour_filter != 'COLOR_BGR2GRAY':
+            colour_filter = set_different_colour_filter(colour_filter)
+        else:
+            colour_filter = cv2.COLOR_BGR2GRAY
+        '''
+        default = _config['DEFAULT_SETTINGS']
+        evaluation = _config['EVALUATION_SETTINGS']
+        video = _config['VIDEO_SETTINGS']
+        track = _config['TRACK_SELECTION']
+        basic_settings_dict = {
+            'video extension': basic_recording.get('video extension'),
+            'frames per second': basic_recording.getfloat('frames per second'),
+            'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
+            'frame height': basic_recording.getint('frame height'),
+            'frame width': basic_recording.getint('frame width'),
+            'white bacteria on dark background': basic_recording.getboolean('white bacteria on dark background'),
+            'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),
+        }
+
         default_settings_dict = {
             'user_input': default.getboolean('user input'),
             'shut_down_after_analysis': default.getboolean('shut down after analysis'),
@@ -443,117 +576,198 @@ def get_configs(first_try=True):
             'log_file': default.get('log file path')
         }
 
-        video_settings = _config['VIDEO_SETTINGS']
-        set_different_colour_filter_bool = video_settings.getboolean('set_color_filter', fallback=False)
-        colour_filter = cv2.COLOR_BGR2GRAY
-        if set_different_colour_filter_bool:
-            colour_filter = set_different_colour_filter(video_settings.get('color filter', fallback='COLOR_BGR2GRAY'))
-
         video_settings_dict = {
-            'frames_per_second': video_settings.getfloat('frames per second'),
-            'pixel_per_micrometre': video_settings.getfloat('pixel per micrometre'),
-            'frame_height': video_settings.getint('frame height'),
-            'frame_width': video_settings.getint('frame width'),
-            'min_frame_count': video_settings.getint('minimal frame count'),
-            'threshold_offset': video_settings.getint('threshold offset for detection'),
-            'stop_on_error': video_settings.getboolean('stop on error'),
-            'video_extension': video_settings.get('video extension'),
+            'frames_per_second': video.getfloat('frames per second'),  # @todo: moved to basic
+            'pixel_per_micrometre': video.getfloat('pixel per micrometre'),  # @todo: moved to basic
+            'frame_height': video.getint('frame height'),  # @todo: moved to basic
+            'frame_width': video.getint('frame width'),  # @todo: moved to basic
+            'min_frame_count': video.getint('minimal frame count'),
+            'threshold_offset': video.getint('threshold offset for detection'),
+            'stop_on_error': video.getboolean('stop on error'),
+            'video_extension': video.get('video extension'),  # @todo: moved to basic
             'use_default_extensions':
-                video_settings.getboolean('use default extensions (.avi, .mp4, .mov)', fallback=True),
+                video.getboolean('use default extensions (.avi, .mp4, .mov)', fallback=True),
             'white_bacteria_on_dark_background':
-                video_settings.getboolean('white bacteria on dark background'),
-            'use_luminosity': video_settings.getboolean('include luminosity in tracking calculation'),
-            'show_videos': video_settings.getboolean('show videos'),
-            'save_video': video_settings.getboolean('save video'),
-            'set_color_filter': set_different_colour_filter_bool,
+                video.getboolean('white bacteria on dark background'),  # @todo: moved to basic
+            'use_luminosity': video.getboolean('include luminosity in tracking calculation'),
+            'show_videos': video.getboolean('show videos'),
+            'save_video': video.getboolean('save video'),
             'color_filter': colour_filter,
         }
 
-        track_settings = _config['TRACK_SELECTION']
         track_selection_dict = {
-            'max_average_area': track_settings.getfloat('exclude measurement when above x times average area'),
-            'min_px': track_settings.getfloat('size outliers lower end in px'),
-            'max_px': track_settings.getfloat('size outliers upper end in px'),
-            'min_size': track_settings.getint('minimal length in seconds'),
-            'max_holes': track_settings.getint('maximal consecutive holes'),
-            'max_duration_size_ratio': (track_settings.getfloat('maximal empty frames in %', fallback=5) / 100 + 1),
-            'omit_motility_outliers': track_settings.getboolean('try to omit motility outliers'),
+            'max_average_area': track.getfloat('exclude measurement when above x times average area'),
+            'min_px': track.getfloat('size outliers lower end in px'),
+            'max_px': track.getfloat('size outliers upper end in px'),
+            'min_size': track.getint('minimal length in seconds'),
+            'max_holes': track.getint('maximal consecutive holes'),
+            'max_duration_size_ratio': (track.getfloat('maximal empty frames in %', fallback=5) / 100 + 1),
+            'omit_motility_outliers': track.getboolean('try to omit motility outliers'),
             'motility_outliers_max':
-                track_settings.getfloat('stop excluding motility outliers if total count above percent (0 for off)')
+                track.getfloat('stop excluding motility outliers if total count above percent (0 for off)')
                 / 100,
-            'cutoff_area_quantile': (track_settings.getfloat('percent quantiles excluded area', fallback=10) / 100),
-            'min_size_ratio': track_settings.getfloat('average width/height ratio min.'),
-            'max_size_ratio': track_settings.getfloat('average width/height ratio max.'),
+            'cutoff_area_quantile': track.getfloat('percent quantiles excluded area', fallback=10) / 100,
+            'average width/height ratio min.': min_size_ratio,
+            'average width/height ratio max.': max_size_ratio,
             'frame_exclusion_percentage':
-                (track_settings.getfloat('percent of screen edges to exclude', fallback=5) / 100),
-            'max_recursion_depth': track_settings.getint('maximal recursion depth (0 is off)'),
+                track.getfloat('percent of screen edges to exclude') / 100,
+            'max_recursion_depth': track.getint('maximal recursion depth (0 is off)'),
         }
 
-        eval_settings = _config['EVALUATION_SETTINGS']
         eval_settings_dict = {
-            'evaluate_files': eval_settings.getboolean('evaluate files after analysis'),
-            'limit_track_length': eval_settings.getint('limit track length to seconds (0 is off)'),
-            'limit_track_length_exact': eval_settings.getboolean('limit track length exactly'),
-            'large_plots': eval_settings.getboolean('show large plots'),
-            'min_angle': eval_settings.getfloat('min. angle in degrees for turning point'),
-            'angle_diff': eval_settings.getint('compare angle between n frames'),
+            'evaluate_files': evaluation.getboolean('evaluate files after analysis'),
+            'limit_track_length': evaluation.getint('limit track length to seconds (0 is off)'),
+            'limit_track_length_exact': evaluation.getboolean('limit track length exactly'),
+            'large_plots': evaluation.getboolean('show large plots'),
+            'min_angle': evaluation.getfloat('min. angle in degrees for turning point'),
+            'angle_diff': evaluation.getint('compare angle between n frames'),
         }
 
-        test_settings = _config['TEST_SETTINGS']
         test_settings_dict = {
-            'debugging': test_settings.getboolean('debugging'),
-            'test_video': test_settings.get('path to test video'),
-            'test_csv': test_settings.get('path to test .csv')
+            'debugging': test.getboolean('debugging'),
+            'test_video': test.get('path to test video'),
+            'test_csv': test.get('path to test .csv')
         }
+        
         settings_dicts = [default_settings_dict, video_settings_dict,
                           track_selection_dict, eval_settings_dict, test_settings_dict]
-        for settings_dict in settings_dicts:  # check for missing values
-            if verbose:
-                logger.debug('tracking.ini settings:')
-            for test_key in settings_dict:
-                if settings_dict[test_key] is None:
-                    error = 'tracking.ini is missing a value in {}'.format(test_key)
-                    logger.critical(error)
-                    settings_dicts = None
-                    break
-                elif verbose:
-                    logger.debug('{}: {}'.format(test_key, settings_dict[test_key]))
+        '''
+        settings_dict = {
+            # _config['BASIC RECORDING SETTINGS']
+            'video extension': basic_recording.get('video extension'),
+            'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
+            'frames per second': basic_recording.getfloat('frames per second'),
+            'frame height': basic_recording.getint('frame height'),
+            'frame width': basic_recording.getint('frame width'),
+            'white bacteria on dark background': basic_recording.getboolean(
+                'white bacteria on dark background'),
+            'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),  # NEW
+            'threshold offset for detection': basic_recording.getint('threshold offset for detection'),
+
+            # _config['BASIC TRACK DATA ANALYSIS SETTINGS']
+            'minimal length in seconds': basic_track.getfloat('minimal length in seconds'),
+            'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),  # __RENAMED__
+            'minimal angle in degrees for turning point': basic_track.getfloat(
+                'minimal angle in degrees for turning point'),  # __RENAMED__
+            'extreme size outliers lower end in px': basic_track.getint(
+                'extreme size outliers lower end in px'),
+            'extreme size outliers upper end in px': basic_track.getint(
+                'extreme size outliers upper end in px'),
+
+            # _config['DISPLAY SETTINGS']
+            'user input': display.getboolean('user input'),
+            'select files': display.getboolean('select files'),
+            'display video analysis': display.getboolean('display video analysis'),  # __RENAMED__
+            'save video': display.getboolean('save video'),
+
+            # _config['RESULTS SETTINGS']
+            'evaluate files after analysis': results.getboolean('evaluate files after analysis'),
+            # @todo: evaluate files after analysis -> done via plot image selection?
+            'rename previous result .csv': results.getboolean('rename previous result .csv'),
+            'delete .csv file after analysis': results.getboolean('delete .csv file after analysis'),
+            'store processed .csv file': results.getboolean('store processed .csv file'),  # NEW
+            'store generated statistical .csv file': results.getboolean(
+                'store generated statistical .csv file'),  # NEW
+            'save large plots': results.getboolean('save large plots'),  # __RENAMED__
+            'save rose plot': results.getboolean('save rose plot'),  # NEW
+            'save time violin plot': results.getboolean('save time violin plot'),  # NEW
+            'save acr violin plot': results.getboolean('save acr violin plot'),  # NEW
+            'save distance violin plot': results.getboolean('save distance violin plot'),  # NEW
+            'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
+            'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
+            # @todo:  .get(# @todo)split selector / group split unit for violin plots
+
+            # _config['LOGGING SETTINGS']
+            'log to file': log_settings.getboolean('log to file'),  # NEW
+            'log file path': log_settings.get('log file path'),
+            'shorten displayed logging output': log_settings.getboolean(
+                'shorten displayed logging output'),
+            'shorten logfile logging output': log_settings.getboolean(
+                'shorten logfile logging output'),  # NEW
+            'set logging level (debug/info/warning/critical)': set_log_level_setting,
+            'verbose': verbose,
+
+            # _config['ADVANCED VIDEO SETTINGS']
+            'use default extensions (.avi, .mp4, .mov)': adv_video.getboolean(
+                'use default extensions (.avi, .mp4, .mov)'),
+            'include luminosity in tracking calculation': adv_video.getboolean(
+                'include luminosity in tracking calculation'),
+            'color filter': colour_filter,
+            'maximal video file age (infinite or seconds)': adv_video.get(
+                'maximal video file age (infinite or seconds)'),
+            'minimal video file age in seconds': adv_video.getint('minimal video file age in seconds'),
+            'minimal frame count': adv_video.getint('minimal frame count'),
+            'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),  # __RENAMED__
+            'list save length interval': adv_video.getint('list save length interval'),
+
+            # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
+            'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
+            'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %'),
+            'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area'),
+            'try to omit motility outliers': adv_track.getboolean('try to omit motility outliers'),
+            'stop excluding motility outliers if total count above percent (0 for off)': adv_track.getfloat(
+                'stop excluding motility outliers if total count above percent (0 for off)'),
+            'exclude measurement when above x times average area': adv_track.getfloat(
+                'exclude measurement when above x times average area'),
+            'average width/height ratio min.': min_size_ratio,
+            'average width/height ratio max.': max_size_ratio,
+            'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude'),
+            'maximal recursion depth (0 is off)': adv_track.getint('maximal recursion depth (0 is off)'),
+            'limit track length exactly': adv_track.getboolean('limit track length exactly'),
+            'compare angle between n frames': adv_track.getint('compare angle between n frames'),
+
+            # _config['HOUSEKEEPING']
+            'last backup': housekeeping.get('last backup'),
+            'previous directory': housekeeping.get('previous directory', fallback='./'),
+            'shut down after analysis': housekeeping.getboolean('shut down after analysis'),
+
+            # _config['TEST SETTINGS']
+            'debugging': test.getboolean('debugging'),
+            'path to test video': test.get('path to test video'),
+            'path to test .csv': test.get('path to test .csv'),
+        }
+        if verbose:
+            logger.debug('tracking.ini settings:')
+        for test_key in settings_dict:
+            if settings_dict[test_key] is None:
+                error = 'tracking.ini is missing a value in {}'.format(test_key)
+                logger.critical(error)
+                settings_dict = None
+                break
+            elif verbose:
+                logger.debug('{}: {}'.format(test_key, settings_dict[test_key]))
     except Exception as ex:
-        template = 'An exception of type {0} occurred while attempting to read tracking.ini. Arguments:'
-        logger.critical(template.format(type(ex).__name__, ))
-        for line in str(ex.args).splitlines():
-            logger.critical('{}'.format(line))
+        template = 'An exception of type {0} occurred while attempting to read tracking.ini. Arguments:\n{1!r}'
+        logger.exception(template.format(type(ex).__name__, ex.args))
     finally:
         pass
-    if first_try and not settings_dicts:
+    if not settings_dict:  # something went wrong, presumably missing/broken entries
         try:
             old_tracking_ini = '{}_tracking.ini.old'.format(datetime.now().strftime('%y%m%d%H%M%S'))
             os.rename('tracking.ini', old_tracking_ini)
             logger.critical('Old tracking.ini renamed to {}'.format(old_tracking_ini))
         finally:
-            create_configs()
-            return get_configs(first_try=False)  # avoid infinite loop
-    elif not first_try and not settings_dicts:
-        logger.critical('Fatal: Could not access or restore tracking.ini')
-    return settings_dicts
+            create_configs()  # re-create tracking.ini
+            return None
+    return settings_dict
 
 
-def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log', use_short=False):
+def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
+                short_stream_output=False, short_file_output=False, log_to_file=False):
     # The loggers name is "ei". This is german for "egg". There is no good reason for this.
     logger = logging.getLogger('ei')
     logger.propagate = False
     # Log message setup
-    format_for_logging = '{asctime:}\t' \
-                         '{name:21.21}\t' \
-                         '{funcName:14.14}\t' \
-                         '{lineno:>4}\t' \
-                         '{levelname:8.8}\t' \
-                         '{process:>5}:\t' \
-                         '{message}'
-    short_format = logging.Formatter('{asctime:},{msecs:03.0f} {levelname:} {process:}:\n{message}', '%H:%M:%S',
-                                     style='{')
+    long_format_logging = '{asctime:}\t' \
+                          '{name:21.21}\t' \
+                          '{funcName:14.14}\t' \
+                          '{lineno:>4}\t' \
+                          '{levelname:8.8}\t' \
+                          '{process:>5}:\t' \
+                          '{message}'
+    short_format_logging = '{asctime:}\t{levelname:8.8}\t{process:>5}:\t{message}'
     # Sets the global logging format.
-    logging.basicConfig(format=(format_for_logging, "%Y-%m-%dT%H:%M:%S%z"), style='{')
+    logging.basicConfig(format=(long_format_logging, ), style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"
     queue_listener = None
     if len(logger.handlers) > 0:
         for handler in logger.handlers:
@@ -561,25 +775,39 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log', use_short
                 queue_listener = handler  # if we have our handler, we can stop
                 break
     if not queue_listener:  # otherwise, we have to set it up
-        logger_formatter = logging.Formatter(format_for_logging, style='{')  # ISO8601: , "%Y-%m-%dT%H:%M:%S%z"
-        stream_handler_logger = logging.StreamHandler(sys.stdout)
-        if not use_short:
-            stream_handler_logger.setFormatter(logger_formatter)
-        else:
-            stream_handler_logger.setFormatter(short_format)
-        file_handler_logger = logging.FileHandler(filename=logfile_name, mode='a', )
-        file_handler_logger.setFormatter(logger_formatter)
-
-        # Set up log queue, add all listeners to queue
+        logger_formatter = logging.Formatter(long_format_logging, style='{')  # ISO8601: , "%Y-%m-%dT%H:%M:%S%z"
+        short_logger_formatter = logging.Formatter(short_format_logging, style='{')
+        logger.setLevel(log_level)
         log_queue = Queue(-1)
         queue_handler = QueueHandler(log_queue)
         logger.addHandler(queue_handler)
-        queue_listener = QueueListener(log_queue, stream_handler_logger, file_handler_logger)
-        queue_listener.start()
-        logger.setLevel(log_level)
+        # Stream handler
+        stream_handler_logger = logging.StreamHandler(sys.stdout)
         stream_handler_logger.setLevel(log_level)
-        file_handler_logger.setLevel(log_level)
-    return queue_listener, format_for_logging
+        if short_stream_output:
+            stream_handler_logger.setFormatter(short_logger_formatter)
+        else:
+            stream_handler_logger.setFormatter(logger_formatter)
+        # File handler
+        if log_to_file:
+            file_handler_logger = logging.FileHandler(filename=logfile_name, mode='a', )
+            file_handler_logger.setLevel(log_level)
+            if short_file_output:
+                file_handler_logger.setFormatter(short_logger_formatter)
+            else:
+                file_handler_logger.setFormatter(logger_formatter)
+            queue_listener = QueueListener(log_queue, stream_handler_logger, file_handler_logger)
+        else:
+            queue_listener = QueueListener(log_queue, stream_handler_logger)
+        queue_listener.start()
+    # If a file is present the file format trumps stream format as the file will be a permanent record
+    # and I can't figure out how to log different messages per logger
+    return_format = long_format_logging
+    if log_to_file and short_file_output:
+        return_format = short_format_logging
+    elif not log_to_file and short_stream_output:
+        return_format = short_format_logging
+    return queue_listener, return_format
 
 
 def get_data(csv_file_path, dtype=None):
@@ -632,9 +860,9 @@ def logfile_padding(logfile, breaker=0):
     with open(logfile, 'r+') as file:
         for line in file:
             pass  # get to last line
-        if line:
+        if line:  # in case of empty file
             if line not in {'\n', '\r', '\r\n'}:  # check if line contains a newline character
-                file.write('\n')
+                file.write('\n')  # python substitutes \n for OS specific one
             else:
                 return
         else:
@@ -797,14 +1025,15 @@ def sort_list(file_path=None, sort=None, df=None, save_file=True):
 
 
 if __name__ == '__main__':
+    get_loggers(log_to_file=False, short_stream_output=True)
     _backup(skip_check_time=False)
-    create_configs()
-    # d = get_configs()
-    # if d is not None:
-    #     for dic in d:
-    #         print('{}'.format('#' * 50))
-    #         for key in dic:
-    #             print(key, ': ', dic[key])
-    #             if dic[key] is None:
-    #                 print('MISSING: {}'.format(key))
+    # create_configs()
+    dic = get_configs()
+    sleep(0.3)
+    if dic is not None:
+        print('{}'.format('#' * 50))
+        for key in dic:
+            print(key, ': ', dic[key])
+            if dic[key] is None:
+                print('MISSING: {}'.format(key))
     sys.exit()
