@@ -33,6 +33,7 @@ from scipy.spatial import distance as dist
 
 from helper_file import (
     _backup,
+    _mkdir,
     different_tracks,
     elapsed_time,
     find_paths,
@@ -373,7 +374,7 @@ def track_bacteria(curr_path, settings=None):
                         fps=fps_of_file,
                         frame_height=frame_height,
                         frame_width=frame_width,
-                        settings_dicts=settings,
+                        settings=settings,
                         create_logger=False,
                         )
         if settings['delete .csv file after analysis']:
@@ -1386,33 +1387,41 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
 
 
 def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None, daily_directory=None,
-                settings_dicts=None, create_logger=True, ):
+                settings=None, create_logger=True, ):
     logger = logging.getLogger('ei').getChild(__name__)
-    if settings_dicts is None:
-        settings_dicts = get_configs()
-        if settings_dicts is None:
+    '''
+    settings['log_level']
+    settings['log file path']
+    settings['shorten displayed logging output']
+    settings['shorten logfile logging output']
+    settings['log to file']
+    '''
+    if settings is None:
+        settings = get_configs()
+        if settings is None:
             logger.critical('No settings provided / could not get settings for start_it_up().')
             return None
-    default = settings_dicts[0]
     if create_logger:
-        get_loggers(log_level=default['logging_level'],
-                    logfile_name=default['log_file'],
-                    short_stream_output=default['short_sys_log'])
+        get_loggers(log_level=settings['log_level'],
+                    logfile_name=settings['log file path'],
+                    short_stream_output=settings['shorten displayed logging output'],
+                    short_file_output=settings['shorten logfile logging output'],
+                    log_to_file=settings['log to file'],)
     end_string = None
     folder_time = str(strftime('%y%m%d', localtime()))
-    dir_form = '{}/{}_Results/'
+    dir_form = '{}/{}_Results/'  # @todo: specify results folder
     if daily_directory is None:
         if isinstance(path_to_files, str) or isinstance(path_to_files, os.PathLike):
             daily_directory = dir_form.format(os.path.dirname(path_to_files), folder_time)
         elif isinstance(path_to_files, list) or isinstance(path_to_files, tuple):
             daily_directory = dir_form.format(os.path.dirname(path_to_files[0]), folder_time)
         else:
-            logger.critical('Could not access base path in path to files; '
-                            'results folder set to {}'.format(os.path.abspath('./')))
             daily_directory = dir_form.format('.', folder_time)
+            logger.critical('Could not access base path in path to files; '
+                            'results folder set to {}'.format(os.path.abspath(daily_directory)))
         if not os.path.exists(daily_directory):
             try:
-                os.makedirs(daily_directory)
+                _mkdir(daily_directory)
                 logger.info('Results folder: {}'.format(daily_directory))
             except OSError as makedir_error:
                 logger.exception(makedir_error)
@@ -1432,7 +1441,7 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
                                        fps=fps,
                                        frame_height=frame_height,
                                        frame_width=frame_width,
-                                       settings=settings_dicts)
+                                       settings=settings)
         # Proceed normally otherwise:
         elif os.path.isfile(path_to_files):
             logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
@@ -1441,7 +1450,7 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
                                        fps=fps,
                                        frame_height=frame_height,
                                        frame_width=frame_width,
-                                       settings=settings_dicts)
+                                       settings=settings)
         else:
             logger.warning('File {} was skipped during evaluation, '
                            'file did not exist or could not be accessed. '.format(path_to_files))
@@ -1456,7 +1465,7 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
                                                 fps=fps,
                                                 frame_height=frame_height,
                                                 frame_width=frame_width,
-                                                settings=settings_dicts))
+                                                settings=settings))
             else:
                 logger.warning('File {} was skipped during evaluation, '
                                'file did not exist or could not be accessed. '.format(curr_path_to_file))
@@ -1471,15 +1480,17 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
 if __name__ == '__main__':
     t_one = datetime.now()  # to get rough time estimation
     # Log message setup
-    all_settings_dicts = get_configs()  # Get settings
-    if all_settings_dicts is not None:
-        default_settings, video_settings, _, eval_settings, test_settings = all_settings_dicts
-    else:
+    settings_ = get_configs()  # Get settings
+    if settings_ is None:
         sys.exit('Fatal error in retrieving tracking.ini')
     _backup()
     queue_listener, format_for_logging = get_loggers(
-        log_level=default_settings['logging_level'], logfile_name=default_settings['log_file'],
-        short_stream_output=default_settings['short_sys_log'])
+        log_level=settings_['log_level'],
+        logfile_name=settings_['log file path'],
+        short_stream_output=settings_['shorten displayed logging output'],
+        short_file_output=settings_['shorten logfile logging output'],
+        log_to_file=settings_['log to file'],
+    )
     # Log some general stuff
     logger_main = logging.getLogger('ei').getChild(__name__)
     explain_logger_setup = format_for_logging.format(**{

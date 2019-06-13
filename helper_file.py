@@ -76,108 +76,7 @@ def bytes_to_human_readable(number_of_bytes):
 def create_configs():
     logger = logging.getLogger('ei').getChild(__name__)
     configfilepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
-    '''
-    _config['BASIC_RECORDING_SETTINGS'] = {
-        'video extension': '.mp4',
-        'frames per second': 30,
-        'pixel per micrometre': 1.41888781,
-        'frame height': 922,
-        'frame width': 1228,
-        'white bacteria on dark background': True,
-        'rod shaped bacteria': True,
-    }
 
-    _config['TRACK_DATA_ANALYSIS_SETTINGS'] = {
-
-    }
-
-    _config['RESULTS_SETTING'] = {
-
-    }
-
-    _config['DEFAULT_SETTINGS'] = {
-        'user input': True,
-        'shut down after analysis': False,
-        'select files': True,
-        'verbose': False,
-        'rename previous result .csv': False,
-        'delete .csv file after analysis': True,
-        'previous directory': './',
-        'list save length interval': 10000,
-        # see below
-        'time since creation in seconds': 0,
-        'maximal video file age (infinite or seconds)': 'infinite',
-        'set logging level (debug/info/warning/critical)': 'debug',
-        'shorten displayed logging output': False,
-        'log file path': './logfile.log',
-    }
-    _config.set('DEFAULT_SETTINGS',
-                '# color filter must be conversion to gray value. Set set_color_filter to True in '
-                'order to change. Also accepts integer value of flag.')
-    _config.set('DEFAULT_SETTINGS',
-                '# list save length: interval in which results are saved to disc, optimum is '
-                'system/hardware dependent. Fiddle around if memory or performance is an issue. '
-                'Saves at maximum once per frame; if this is an issue move save block in '
-                'track_bacteria() into object.items() loop')
-    _config.set('DEFAULT_SETTINGS',
-                '# set logging level options: debug, info, warning, critical')
-
-    # _config['DETECTION_SETTINGS'] = {}
-
-    _config['VIDEO_SETTINGS'] = {
-        'frames per second': 30,  # @todo: moved to basic
-        'pixel per micrometre': 1.41888781,  # @todo: moved to basic
-        'frame height': 922,  # @todo: moved to basic
-        'frame width': 1228,  # @todo: moved to basic
-        'minimal frame count': 600,
-        'threshold offset for detection': 5,
-        'stop on error': True,
-        'video extension': '.mp4',  # @todo: moved to basic
-        'use default extensions (.avi, .mp4, .mov)': True,
-        'white bacteria on dark background': True,  # @todo: moved to basic
-        'include luminosity in tracking calculation': False,
-        'show videos': False,
-        'save video': False,
-        'color filter': 'COLOR_BGR2GRAY',
-    }
-
-    _config['TRACK_SELECTION'] = {
-        'size outliers lower end in px': 2,  # @todo: moved to TRACK_DATA_ANALYSIS
-        'size outliers upper end in px': 50,  # @todo: moved to TRACK_DATA_ANALYSIS
-        'exclude measurement when above x times average area': 1.5,
-        'minimal length in seconds': 20,  # @todo: moved to TRACK_DATA_ANALYSIS
-        'maximal consecutive holes': 5,
-        'maximal empty frames in %': 5,
-        'percent quantiles excluded area': 10,
-        'try to omit motility outliers': True,
-        'stop excluding motility outliers if total count above percent (0 for off)': 5,
-        'rod average width/height ratio min.': 0.125,
-        'rod average width/height ratio max.': 0.67,
-        'coccoid average width/height ratio min.': 0.8,
-        'coccoid average width/height ratio max.': 1.0,
-        'percent of screen edges to exclude': 5,
-        'maximal recursion depth (0 is off)': 960,
-    }
-
-    _config['EVALUATION_SETTINGS'] = {
-        'evaluate files after analysis': True,
-        'show large plots': False,
-        'limit track length to seconds (0 is off)': 20,  # @todo: moved to TRACK_DATA_ANALYSIS
-        'limit track length exactly': False,
-        'compare angle between n frames': 10,  # @todo: change to 1/3 s taken from fps
-        'min. angle in degrees for turning point': 30,  # @todo: moved to TRACK_DATA_ANALYSIS
-    }
-    _config.set('EVALUATION_SETTINGS',
-                '# Limit track length: 0 for off; will otherwise take set frames for analysis, '
-                'or maximum track length, whichever is shorter.')
-
-    _config['TEST_SETTINGS'] = {
-        'debugging': False,
-        'path to test video': 'Q:/test_video.avi',
-        'path to test .csv': 'Q:/test_list.csv',
-        'last backup': '2019-03-29 13:37:30.330330',
-    }
-    '''
     _config['BASIC RECORDING SETTINGS'] = {
         'video extension': '.mp4',
         'pixel per micrometre': 1.41888781,
@@ -545,94 +444,7 @@ def get_configs(tracking_ini_filepath=None):
             colour_filter = set_different_colour_filter(colour_filter)
         else:
             colour_filter = cv2.COLOR_BGR2GRAY
-        '''
-        default = _config['DEFAULT_SETTINGS']
-        evaluation = _config['EVALUATION_SETTINGS']
-        video = _config['VIDEO_SETTINGS']
-        track = _config['TRACK_SELECTION']
-        basic_settings_dict = {
-            'video extension': basic_recording.get('video extension'),
-            'frames per second': basic_recording.getfloat('frames per second'),
-            'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
-            'frame height': basic_recording.getint('frame height'),
-            'frame width': basic_recording.getint('frame width'),
-            'white bacteria on dark background': basic_recording.getboolean('white bacteria on dark background'),
-            'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),
-        }
 
-        default_settings_dict = {
-            'user_input': default.getboolean('user input'),
-            'shut_down_after_analysis': default.getboolean('shut down after analysis'),
-            'select_files': default.getboolean('select files'),
-            'verbose': verbose,
-            'store_old_list': default.getboolean('rename previous result .csv'),
-            'delete_csv_afterwards': default.getboolean('delete .csv file after analysis'),
-            'previous_directory': default.get('previous directory', fallback='./'),
-            'list_save_length_interval': default.getint('list save length interval'),
-            'minimal_video_age': default.getint('time since creation in seconds'),
-            'maximal_video_age': default.get('maximal video file age (infinite or seconds)'),
-            'logging_level': set_log_level_setting,
-            'logging_level_name': set_log_level,
-            'short_sys_log': default.getboolean('shorten displayed logging output'),
-            'log_file': default.get('log file path')
-        }
-
-        video_settings_dict = {
-            'frames_per_second': video.getfloat('frames per second'),  # @todo: moved to basic
-            'pixel_per_micrometre': video.getfloat('pixel per micrometre'),  # @todo: moved to basic
-            'frame_height': video.getint('frame height'),  # @todo: moved to basic
-            'frame_width': video.getint('frame width'),  # @todo: moved to basic
-            'min_frame_count': video.getint('minimal frame count'),
-            'threshold_offset': video.getint('threshold offset for detection'),
-            'stop_on_error': video.getboolean('stop on error'),
-            'video_extension': video.get('video extension'),  # @todo: moved to basic
-            'use_default_extensions':
-                video.getboolean('use default extensions (.avi, .mp4, .mov)', fallback=True),
-            'white_bacteria_on_dark_background':
-                video.getboolean('white bacteria on dark background'),  # @todo: moved to basic
-            'use_luminosity': video.getboolean('include luminosity in tracking calculation'),
-            'show_videos': video.getboolean('show videos'),
-            'save_video': video.getboolean('save video'),
-            'color_filter': colour_filter,
-        }
-
-        track_selection_dict = {
-            'max_average_area': track.getfloat('exclude measurement when above x times average area'),
-            'min_px': track.getfloat('size outliers lower end in px'),
-            'max_px': track.getfloat('size outliers upper end in px'),
-            'min_size': track.getint('minimal length in seconds'),
-            'max_holes': track.getint('maximal consecutive holes'),
-            'max_duration_size_ratio': (track.getfloat('maximal empty frames in %', fallback=5) / 100 + 1),
-            'omit_motility_outliers': track.getboolean('try to omit motility outliers'),
-            'motility_outliers_max':
-                track.getfloat('stop excluding motility outliers if total count above percent (0 for off)')
-                / 100,
-            'cutoff_area_quantile': track.getfloat('percent quantiles excluded area', fallback=10) / 100,
-            'average width/height ratio min.': min_size_ratio,
-            'average width/height ratio max.': max_size_ratio,
-            'frame_exclusion_percentage':
-                track.getfloat('percent of screen edges to exclude') / 100,
-            'max_recursion_depth': track.getint('maximal recursion depth (0 is off)'),
-        }
-
-        eval_settings_dict = {
-            'evaluate_files': evaluation.getboolean('evaluate files after analysis'),
-            'limit_track_length': evaluation.getint('limit track length to seconds (0 is off)'),
-            'limit_track_length_exact': evaluation.getboolean('limit track length exactly'),
-            'large_plots': evaluation.getboolean('show large plots'),
-            'min_angle': evaluation.getfloat('min. angle in degrees for turning point'),
-            'angle_diff': evaluation.getint('compare angle between n frames'),
-        }
-
-        test_settings_dict = {
-            'debugging': test.getboolean('debugging'),
-            'test_video': test.get('path to test video'),
-            'test_csv': test.get('path to test .csv')
-        }
-        
-        settings_dicts = [default_settings_dict, video_settings_dict,
-                          track_selection_dict, eval_settings_dict, test_settings_dict]
-        '''
         settings_dict = {
             # _config['BASIC RECORDING SETTINGS']
             'video extension': basic_recording.get('video extension'),
@@ -705,7 +517,7 @@ def get_configs(tracking_ini_filepath=None):
             # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
             'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
             'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %') / 100 + 1,
-            'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,
+            'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,  # 0 off
             'try to omit motility outliers': adv_track.getboolean('try to omit motility outliers'),
             'stop excluding motility outliers if total count above percent': adv_track.getfloat(
                 'stop excluding motility outliers if total count above percent') / 100,
@@ -714,7 +526,7 @@ def get_configs(tracking_ini_filepath=None):
             'average width/height ratio min.': min_size_ratio,
             'average width/height ratio max.': max_size_ratio,
             'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude') / 100,
-            'maximal recursion depth (0 is off)': adv_track.getint('maximal recursion depth (0 is off)'),
+            'maximal recursion depth (0 is off)': adv_track.getint('maximal recursion depth (0 is off)'),  # 0 off
             'limit track length exactly': adv_track.getboolean('limit track length exactly'),
             'compare angle between n frames': adv_track.getint('compare angle between n frames'),
             'force tracking.ini fps settings': adv_video.getboolean('force tracking.ini fps settings'),  # NEW
@@ -768,6 +580,7 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                           '{levelname:8.8}\t' \
                           '{process:>5}:\t' \
                           '{message}'
+    # '{filename:18:18}\t' \
     short_format_logging = '{asctime:}\t{levelname:8.8}\t{process:>5}:\t{message}'
     # Sets the global logging format.
     logging.basicConfig(format=(long_format_logging, ), style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"

@@ -1,5 +1,5 @@
 **/*.log*
-*.ini
+*.ini*
 *.xml
 *.iml
 *_sync*

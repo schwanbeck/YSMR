@@ -56,6 +56,7 @@ if __name__ == '__main__':
         'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
         'name': 'logger name',
         'funcName': 'function name',
+        'filename': 'file name',
         'lineno': 'lNr',
         'levelname': 'level',
         'process': 'PID',
@@ -137,7 +138,7 @@ if __name__ == '__main__':
                 extensions = ['.avi', '.mp4', '.mov']
             else:
                 extensions = []
-            if settings['video_extension'] not in extensions:
+            if settings['video extension'] not in extensions:
                 extensions.append(settings['video extension'])
             ext_message = 'Looking for extensions ending in'
             for ext in extensions:
