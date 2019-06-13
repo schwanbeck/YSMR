@@ -238,6 +238,7 @@ def create_configs():
         'minimal frame count': 600,
         'stop evaluation on error': True,  # __RENAMED__
         'list save length interval': 10000,
+        'force tracking.ini fps settings': False,  # NEW
     }
 
     _config['ADVANCED TRACK DATA ANALYSIS SETTINGS'] = {
@@ -245,7 +246,7 @@ def create_configs():
         'maximal empty frames in %': 5,
         'percent quantiles excluded area': 10,
         'try to omit motility outliers': True,
-        'stop excluding motility outliers if total count above percent (0 for off)': 5,
+        'stop excluding motility outliers if total count above percent': 5,
         'exclude measurement when above x times average area': 1.5,
         'rod average width/height ratio min.': 0.125,
         'rod average width/height ratio max.': 0.67,
@@ -286,12 +287,13 @@ def create_configs():
         # @todo: untested on linux & mac
         if os.name is 'nt':  # Windows
             # works with spaces in name whereas subprocess.call(('start', path), shell=True) does not
-            subprocess.call(('cmd /c start "" "{}"'.format(configfilepath)))
+            response = subprocess.run(('cmd /c start "" "{}"'.format(configfilepath)), stderr=subprocess.PIPE)
         elif sys.platform.startswith('darwin'):  # Mac
-            subprocess.call(('open', configfilepath))
+            response = subprocess.call(('open', configfilepath), stderr=subprocess.PIPE)
         else:  # Linux
-            subprocess.call(('xdg-open', configfilepath))
-    except (subprocess.CalledProcessError, FileNotFoundError) as file_open_error:
+            response = subprocess.call(('xdg-open', configfilepath), stderr=subprocess.PIPE)
+        response.check_returncode()
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as file_open_error:
         logger.exception(file_open_error)
     finally:
         pass
@@ -440,10 +442,6 @@ def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, rec
         return None
     if extension is None:
         extension = _config['VIDEO_SETTINGS'].get('extension', fallback='.mp4')
-    # if extension[0] != '.' and len(extension) == 3:
-    #     extension = '.{}'.format(extension)
-    # if minimal_age is None:
-    #     minimal_age = _default.getint('time since creation in seconds', fallback=0)
     if base_path[-1] != '/':
         base_path = '{}/'.format(base_path)
     base_path = '{}**/*{}'.format(base_path, extension)
@@ -454,8 +452,10 @@ def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, rec
         file = file.replace(os.sep, '/')
         # checks if file is young/old enough
         file_creation_date = creation_date(file)
-        if file_creation_date >= 0 or minimal_age < 0:
+        if file_creation_date >= 0 or (file_creation_date < 0 and minimal_age < 0):
             if maximal_age >= file_creation_date >= minimal_age:
+                out_files.append(file)
+            elif file_creation_date < 0 and minimal_age < 0:
                 out_files.append(file)
         else:
             logger.warning('The file appears to be {:.2f} seconds '
@@ -488,12 +488,13 @@ def get_base_path(rename=False, prev_dir=None):
         logger.warning('No Path selected. ')
         return None
     if rename:
-        _config.set('HOUSEKEEPING', 'previous directory', curr_path)
-        with open('tracking.ini', 'w') as configfile:
-            _config.write(configfile)
-        logger.debug('Previous directory set to {}'.format(curr_path))
-    else:
-        logger.debug('Selected path: {}'.format(curr_path))
+        try:
+            _config.set('HOUSEKEEPING', 'previous directory', curr_path)
+            with open('tracking.ini', 'w') as configfile:
+                _config.write(configfile)
+            logger.debug('Previous directory set to {}'.format(curr_path))
+        finally:
+            pass
     return curr_path
 
 
@@ -684,7 +685,8 @@ def get_configs(tracking_ini_filepath=None):
                 'shorten displayed logging output'),
             'shorten logfile logging output': log_settings.getboolean(
                 'shorten logfile logging output'),  # NEW
-            'set logging level (debug/info/warning/critical)': set_log_level_setting,
+            'set logging level (debug/info/warning/critical)': set_log_level,
+            'log_level': set_log_level_setting,
             'verbose': verbose,
 
             # _config['ADVANCED VIDEO SETTINGS']
@@ -702,19 +704,20 @@ def get_configs(tracking_ini_filepath=None):
 
             # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
             'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
-            'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %'),
-            'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area'),
+            'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %') / 100 + 1,
+            'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,
             'try to omit motility outliers': adv_track.getboolean('try to omit motility outliers'),
-            'stop excluding motility outliers if total count above percent (0 for off)': adv_track.getfloat(
-                'stop excluding motility outliers if total count above percent (0 for off)'),
+            'stop excluding motility outliers if total count above percent': adv_track.getfloat(
+                'stop excluding motility outliers if total count above percent') / 100,
             'exclude measurement when above x times average area': adv_track.getfloat(
                 'exclude measurement when above x times average area'),
             'average width/height ratio min.': min_size_ratio,
             'average width/height ratio max.': max_size_ratio,
-            'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude'),
+            'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude') / 100,
             'maximal recursion depth (0 is off)': adv_track.getint('maximal recursion depth (0 is off)'),
             'limit track length exactly': adv_track.getboolean('limit track length exactly'),
             'compare angle between n frames': adv_track.getint('compare angle between n frames'),
+            'force tracking.ini fps settings': adv_video.getboolean('force tracking.ini fps settings'),  # NEW
 
             # _config['HOUSEKEEPING']
             'last backup': housekeeping.get('last backup'),
@@ -736,12 +739,12 @@ def get_configs(tracking_ini_filepath=None):
                 break
             elif verbose:
                 logger.debug('{}: {}'.format(test_key, settings_dict[test_key]))
-    except Exception as ex:
+    except (TypeError, ValueError, KeyError) as ex:  # Exception
         template = 'An exception of type {0} occurred while attempting to read tracking.ini. Arguments:\n{1!r}'
         logger.exception(template.format(type(ex).__name__, ex.args))
     finally:
         pass
-    if not settings_dict:  # something went wrong, presumably missing/broken entries
+    if not settings_dict:  # something went wrong, presumably missing/broken entries or sections
         try:
             old_tracking_ini = '{}_tracking.ini.old'.format(datetime.now().strftime('%y%m%d%H%M%S'))
             os.rename('tracking.ini', old_tracking_ini)
@@ -800,8 +803,9 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
         else:
             queue_listener = QueueListener(log_queue, stream_handler_logger)
         queue_listener.start()
+
     # If a file is present the file format trumps stream format as the file will be a permanent record
-    # and I can't figure out how to log different messages per logger
+    # and I can't figure out how to log different messages per logger in a way that works consistently
     return_format = long_format_logging
     if log_to_file and short_file_output:
         return_format = short_format_logging
@@ -1027,7 +1031,7 @@ def sort_list(file_path=None, sort=None, df=None, save_file=True):
 if __name__ == '__main__':
     get_loggers(log_to_file=False, short_stream_output=True)
     _backup(skip_check_time=False)
-    # create_configs()
+    create_configs()
     dic = get_configs()
     sleep(0.3)
     if dic is not None:
