@@ -103,19 +103,12 @@ if __name__ == '__main__':
             settings['limit track length to x seconds']))
     else:
         logger.info('Full track length will be used in evaluation')
-    try:
-        settings['maximal video file age (infinite or seconds)'] = int(
-            settings['maximal video file age (infinite or seconds)'])
+    if settings['maximal video file age (infinite or seconds)'] == np.inf:
+        logger.debug('maximal video file age (infinite or seconds) set to infinite')
+    else:
         logger.debug('maximal video file age (infinite or seconds) set to {}'.format(
             settings['maximal video file age (infinite or seconds)']))
-    except ValueError as max_vid_age_value_error:
-        if settings['maximal video file age (infinite or seconds)'].lower() == 'infinite':
-            logger.debug('maximal video file age (infinite or seconds) set to infinite')
-        else:
-            logger.exception(max_vid_age_value_error)
-        settings['maximal video file age (infinite or seconds)'] = np.inf
-    finally:
-        pass
+
     # Debug messages
     logger.debug('White bacteria on dark background set to {}'.format(
         settings['white bacteria on dark background']))

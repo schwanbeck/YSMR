@@ -76,11 +76,17 @@ def bytes_to_human_readable(number_of_bytes):
 def create_configs():
     logger = logging.getLogger('ei').getChild(__name__)
     configfilepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
+    try:
+        old_tracking_ini = '{}.{}'.format(configfilepath, datetime.now().strftime('%y%m%d%H%M%S'))
+        os.rename(configfilepath, old_tracking_ini)
+        logger.critical('Old tracking.ini renamed to {}'.format(old_tracking_ini))
+    finally:
+        pass
 
     _config['BASIC RECORDING SETTINGS'] = {
         'video extension': '.mp4',
         'pixel per micrometre': 1.41888781,
-        'frames per second': 30,
+        'frames per second': 30.0,
         'frame height': 922,
         'frame width': 1228,
         'white bacteria on dark background': True,
@@ -91,7 +97,7 @@ def create_configs():
     _config['BASIC TRACK DATA ANALYSIS SETTINGS'] = {
         'minimal length in seconds': 20,
         'limit track length to x seconds': 20,  # __RENAMED__
-        'minimal angle in degrees for turning point': 30,  # __RENAMED__
+        'minimal angle in degrees for turning point': 30.0,  # __RENAMED__
         'extreme size outliers lower end in px': 2,
         'extreme size outliers upper end in px': 50,
     }
@@ -104,7 +110,6 @@ def create_configs():
     }
 
     _config['RESULTS SETTINGS'] = {
-        'evaluate files after analysis': True,  # evaluate files after analysis -> done via plot image selection
         'rename previous result .csv': False,
         'delete .csv file after analysis': True,
         'store processed .csv file': False,  # NEW
@@ -137,24 +142,24 @@ def create_configs():
         'minimal frame count': 600,
         'stop evaluation on error': True,  # __RENAMED__
         'list save length interval': 10000,
-        'force tracking.ini fps settings': False,  # NEW
     }
 
     _config['ADVANCED TRACK DATA ANALYSIS SETTINGS'] = {
         'maximal consecutive holes': 5,
-        'maximal empty frames in %': 5,
-        'percent quantiles excluded area': 10,
+        'maximal empty frames in %': 5.0,
+        'percent quantiles excluded area': 10.0,
         'try to omit motility outliers': True,
-        'stop excluding motility outliers if total count above percent': 5,
+        'stop excluding motility outliers if total count above percent': 5.0,
         'exclude measurement when above x times average area': 1.5,
         'rod average width/height ratio min.': 0.125,
         'rod average width/height ratio max.': 0.67,
         'coccoid average width/height ratio min.': 0.8,
         'coccoid average width/height ratio max.': 1.0,
-        'percent of screen edges to exclude': 5,
-        'maximal recursion depth (0 is off)': 960,
+        'percent of screen edges to exclude': 5.0,
+        'maximal recursion depth': 960,
         'limit track length exactly': False,
         'compare angle between n frames': 10,
+        'force tracking.ini fps settings': False,  # NEW
     }
 
     _config['HOUSEKEEPING'] = {
@@ -406,7 +411,6 @@ def get_configs(tracking_ini_filepath=None):
     if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
         _config.read(tracking_ini_filepath)
     settings_dict = None
-    # @todo: change to one dictionary
     try:
         basic_recording = _config['BASIC RECORDING SETTINGS']
         basic_track = _config['BASIC TRACK DATA ANALYSIS SETTINGS']
@@ -444,6 +448,14 @@ def get_configs(tracking_ini_filepath=None):
             colour_filter = set_different_colour_filter(colour_filter)
         else:
             colour_filter = cv2.COLOR_BGR2GRAY
+        max_vid_age = adv_video.get('maximal video file age (infinite or seconds)')
+        try:
+            max_vid_age = int(max_vid_age)
+        except ValueError as max_vid_age_value_error:
+            if max_vid_age.lower() in 'infinite':
+                max_vid_age = np.inf
+            else:
+                logger.exception(max_vid_age_value_error)
 
         settings_dict = {
             # _config['BASIC RECORDING SETTINGS']
@@ -474,8 +486,6 @@ def get_configs(tracking_ini_filepath=None):
             'save video': display.getboolean('save video'),
 
             # _config['RESULTS SETTINGS']
-            'evaluate files after analysis': results.getboolean('evaluate files after analysis'),
-            # @todo: evaluate files after analysis -> done via plot image selection?
             'rename previous result .csv': results.getboolean('rename previous result .csv'),
             'delete .csv file after analysis': results.getboolean('delete .csv file after analysis'),
             'store processed .csv file': results.getboolean('store processed .csv file'),  # NEW
@@ -507,8 +517,7 @@ def get_configs(tracking_ini_filepath=None):
             'include luminosity in tracking calculation': adv_video.getboolean(
                 'include luminosity in tracking calculation'),
             'color filter': colour_filter,
-            'maximal video file age (infinite or seconds)': adv_video.get(
-                'maximal video file age (infinite or seconds)'),
+            'maximal video file age (infinite or seconds)': max_vid_age,
             'minimal video file age in seconds': adv_video.getint('minimal video file age in seconds'),
             'minimal frame count': adv_video.getint('minimal frame count'),
             'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),  # __RENAMED__
@@ -526,7 +535,7 @@ def get_configs(tracking_ini_filepath=None):
             'average width/height ratio min.': min_size_ratio,
             'average width/height ratio max.': max_size_ratio,
             'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude') / 100,
-            'maximal recursion depth (0 is off)': adv_track.getint('maximal recursion depth (0 is off)'),  # 0 off
+            'maximal recursion depth': adv_track.getint('maximal recursion depth'),  # 0 off
             'limit track length exactly': adv_track.getboolean('limit track length exactly'),
             'compare angle between n frames': adv_track.getint('compare angle between n frames'),
             'force tracking.ini fps settings': adv_video.getboolean('force tracking.ini fps settings'),  # NEW
@@ -557,13 +566,8 @@ def get_configs(tracking_ini_filepath=None):
     finally:
         pass
     if not settings_dict:  # something went wrong, presumably missing/broken entries or sections
-        try:
-            old_tracking_ini = '{}_tracking.ini.old'.format(datetime.now().strftime('%y%m%d%H%M%S'))
-            os.rename('tracking.ini', old_tracking_ini)
-            logger.critical('Old tracking.ini renamed to {}'.format(old_tracking_ini))
-        finally:
-            create_configs()  # re-create tracking.ini
-            return None
+        create_configs()  # re-create tracking.ini
+        return None
     return settings_dict
 
 
@@ -720,7 +724,7 @@ def reshape_result(tuple_of_tuples, *args):
     return tuple(coordinates), additional_info
 
 
-def save_list(file_path, filename, coords=None, get_name=False, first_call=False, store_old_list=True):
+def save_list(file_path, filename, coords=None, get_name=False, first_call=False, rename_old_list=True):
     logger_save_list = logging.getLogger('ei.' + __name__)
     file_csv = '{}/{}_list.csv'.format(file_path, filename)
     if get_name:
@@ -729,7 +733,7 @@ def save_list(file_path, filename, coords=None, get_name=False, first_call=False
     if first_call:  # set up .csv file
         old_list = False
         if os.path.isfile(file_csv):
-            if store_old_list:
+            if rename_old_list:
                 now = datetime.now().strftime('%y%m%d%H%M%S')
                 old_filename, old_file_extension = os.path.splitext(file_csv)
                 old_list = '{}_{}{}'.format(old_filename, now, old_file_extension)
@@ -848,9 +852,8 @@ if __name__ == '__main__':
     dic = get_configs()
     sleep(0.3)
     if dic is not None:
-        print('{}'.format('#' * 50))
         for key in dic:
             print(key, ': ', dic[key])
             if dic[key] is None:
-                print('MISSING: {}'.format(key))
+                print('{} : MISSING/NO_VALUE'.format(key))
     sys.exit()

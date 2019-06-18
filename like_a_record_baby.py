@@ -97,7 +97,7 @@ def track_bacteria(curr_path, settings=None):
     if frame_count < settings['minimal frame count']:
         logger.warning('File {} too short; file was skipped.'.format(curr_path))
         return None
-    try:
+    try:  # @todo: force tracking.ini fps settings
         fps_of_file = cap.get(cv2.CAP_PROP_FPS)
         if settings['verbose'] or fps_of_file != settings['frames per second']:
             logger.info('fps of file: {}'.format(fps_of_file))
@@ -112,7 +112,6 @@ def track_bacteria(curr_path, settings=None):
             fps_of_file = settings['frames per second']
     finally:
         pass
-    test = settings['debugging']
 
     pathname, filename = os.path.split(curr_path)
     list_name = save_list(get_name=True, file_path=pathname, filename=filename)
@@ -120,11 +119,12 @@ def track_bacteria(curr_path, settings=None):
 
     # Set initial values; initialise result list
     old_list = save_list(file_path=pathname, filename=filename,
-                         first_call=True, store_old_list=settings['store processed .csv file'])
+                         first_call=True, rename_old_list=settings['rename previous result .csv'])
     # Save old_list_name for later if it exists; False otherwise
     ct = CentroidTracker()  # Initialise tracker instance
     coords = []  # Empty list to store calculated coordinates
     curr_frame_count = 0
+    # threshold_list = []
     # skip_frames = 0
     total_threshold = 0  # Detection threshold total at which gray value bacteria are detected;
     # calculated differently depending on white_bac_on_black_bgr
@@ -133,7 +133,8 @@ def track_bacteria(curr_path, settings=None):
     error_during_read = False  # Set to true if some errors occur; used to restore old list afterwards if it exists
     (objects, degrees) = (None, None)  # reset objects, additional_info (probably useless but doesn't hurt)
 
-    if test and settings['display video analysis']:  # Display first frame in case frame-by-frame analysis is necessary
+    if settings['debugging'] and settings['display video analysis']:
+        # Display first frame in case frame-by-frame analysis is necessary
         ret, frame = cap.read()
         cv2.imshow('{}'.format(filename), frame)
     (frame_height, frame_width) = (int(cap.get(4)),
@@ -176,8 +177,8 @@ def track_bacteria(curr_path, settings=None):
             break
 
         '''
-        SORT THIS SHIT OUT  >  shit sorted, mebbeh?
-        gray -> Threshold direct, threshold fixed at 83 / 68?
+        Various attempts to get threshold right:
+        gray -> Threshold direct, threshold fixed at 83 / 68? -> Illumination changes too often
         gray -> clahe -> Threshold --> can always use same threshold?
         mean, stddev = cv2.meanStdDev(src[, mean[, stddev[, mask]]]) -> find threshold dynamically works
         gray -> blurred -> Threshold (standard?)
@@ -187,17 +188,28 @@ def track_bacteria(curr_path, settings=None):
 
         gray = cv2.cvtColor(frame, settings['color filter'])  # Convert to gray scale
 
-        if curr_frame_count <= settings['minimal frame count']:  # set threshold adaptively  + skip_frames
+        if curr_frame_count <= settings['minimal frame count'] or curr_frame_count <= 20 * fps_of_file:
+            # or <= 20 * fps in case a low threshold was specified
+            # set threshold adaptively @todo: + skip_frames
             mean, stddev = cv2.meanStdDev(gray)
             if settings['white bacteria on dark background']:
-                total_threshold += (mean + stddev + settings['threshold offset for detection'])
+                curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
+                total_threshold += curr_frame_threshold
                 # Bacteria are brighter than background
             else:
-                total_threshold += (mean - stddev - settings['threshold offset for detection'])
+                curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
+                total_threshold += curr_frame_threshold
                 # Bacteria are darker than background
                 # It's sadly not simply (255 - threshold)
+
+            # Moving average with list:
+            # threshold_list.append(curr_frame_threshold)
+            # curr_threshold = int(sum(threshold_list) / len(threshold_list))
+            # if len(threshold_list) > fps_of_file * 20:
+            #     threshold_list = threshold_list[1:]
+
             curr_threshold = int(total_threshold / (curr_frame_count + 1))  # average input  - skip_frames
-            # if your threshold is not ok after 600 frames either install
+            # if your threshold is not ok after 20 s either install
             # a new power source/lamp in your microscope or
             # stop fiddling with brightness during recording
             # Usually stable after ~2 frames
@@ -212,7 +224,7 @@ def track_bacteria(curr_path, settings=None):
         # blurred = cv2.medianBlur(gray, 5)
 
         # UMat: should utilise graphics card; tends to slow down the whole thing a lot
-        # Presumably because a) my graphics card is rubbish, b) the conversion takes too much time,
+        # Presumably because a) my graphics card is rubbish, b) the conversion itself takes too much time,
         # c) subsequent calculations aren't exactly witchcraft, d) all of the above
         # gray = cv2.UMat(gray)
 
@@ -234,7 +246,7 @@ def track_bacteria(curr_path, settings=None):
             # cv2.imshow('frame', frame)
             # cv2.imshow('gray', gray)
             # cv2.imshow('equ', equ)
-            cv2.imshow('blurred', blurred)
+            # cv2.imshow('blurred', blurred)
             cv2.imshow('threshold', thresh)
 
         contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -417,7 +429,7 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
     settings['average width/height ratio min.']
     settings['average width/height ratio max.']
     settings['percent of screen edges to exclude']
-    settings['maximal recursion depth (0 is off)']
+    settings['maximal recursion depth']
     '''
     kick_reason = 7
     return_result = []
@@ -471,11 +483,11 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
             # Hole is index of largest number in df['POSITION_T'].diff()
             hole_idx = look_for_holes.idxmax()
             sub_part.extend([(start, hole_idx - 1), (hole_idx, stop)])
-    elif recursion >= settings['maximal recursion depth (0 is off)'] != 0:
+    elif recursion >= settings['maximal recursion depth'] != 0:
         logger.debug('Recursion reached max. level at TRACK_ID: {} start: {} stop: {}'.format(
             df_passed.loc[start, 'TRACK_ID'], start, stop))
     # stop recursions from causing stack overflows
-    if sub_part and recursion < settings['maximal recursion depth (0 is off)']:
+    if sub_part and recursion < settings['maximal recursion depth']:
         kick_reason_list = [kick_reason]
         for (sub_start, sub_stop) in sub_part:
             if sub_stop - sub_start + 1 < settings['minimal length in seconds']:
@@ -742,12 +754,13 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         df['area'],  # track is fine
         np.NaN  # delete otherwise
     )
-    # Remove frames where bacterial area is 1.5 times average area (or user defined)
-    df['area'] = np.where(
-        df['area'] <= (df['average_area'] * settings['exclude measurement when above x times average area']),
-        df['area'],  # track is fine
-        np.NaN  # delete otherwise
-    )
+    # Remove frames where bacterial area is x times average area
+    if settings['exclude measurement when above x times average area']:
+        df['area'] = np.where(
+            df['area'] <= (df['average_area'] * settings['exclude measurement when above x times average area']),
+            df['area'],  # track is fine
+            np.NaN  # delete otherwise
+        )
     # set zeroes in area to NaN
     # tracker.py sets width/height as 0 if it can't connect tracks, thus every data point with area == 0 is suspect
     df.loc[df['area'] == 0, 'area'] = np.NaN
@@ -771,6 +784,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     #     df['area'],  # track is fine
     #     np.NaN  # delete otherwise
     # )
+
     # remove all rows with a NaN in them - this gets rid of empty/short tracks and empty/suspect measurements
     # As we'll later need only the remaining areas, we'll drop the NaNs
     if settings['verbose']:
