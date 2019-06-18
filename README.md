@@ -31,10 +31,10 @@ Explanation of each setting in the tracking.ini file and the initial default set
 + rod shaped bacteria : True
 	+ If rod shaped bacteria are filmed, set this to 'True'. If the bacteria are coccoidal, set it to 'False'. This is a convenience boolean switch between two presets for length/width ratios. 
 	+ See the under advanced track data analysis settings:
-		+ 'rod average width/height ratio min.' 
-		+ 'rod average width/height ratio max.'^
+		+ 'rod average width/height ratio min.'
+		+ 'rod average width/height ratio max.'
 		+ 'coccoid average width/height ratio min.'
-		+ 'coccoid average width/height ratio max.' 
+		+ 'coccoid average width/height ratio max.'
 	+ Accepts 'True' or 'False'.
 + threshold offset for detection : 5
 	+ Changes the grey value threshold which differentiates between bacteria and background. Decrease if bacteria are often too small or not detected. Increase if background is mistaken for bacteria during detection. 
