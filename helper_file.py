@@ -538,7 +538,7 @@ def get_configs(tracking_ini_filepath=None):
             'maximal recursion depth': adv_track.getint('maximal recursion depth'),  # 0 off
             'limit track length exactly': adv_track.getboolean('limit track length exactly'),
             'compare angle between n frames': adv_track.getint('compare angle between n frames'),
-            'force tracking.ini fps settings': adv_video.getboolean('force tracking.ini fps settings'),  # NEW
+            'force tracking.ini fps settings': adv_track.getboolean('force tracking.ini fps settings'),  # NEW
 
             # _config['HOUSEKEEPING']
             'last backup': housekeeping.get('last backup'),

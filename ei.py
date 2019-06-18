@@ -75,8 +75,6 @@ if __name__ == '__main__':
         logger.warning('Test settings enabled')
     if not cv2.useOptimized():
         logger.warning('Running cv2 unoptimised')
-    if not settings['evaluate files after analysis']:
-        logger.warning('Evaluation of .csv disabled')
     if not settings['rename previous result .csv']:
         logger.warning('Old .csv result lists will be overwritten')
     if settings['delete .csv file after analysis']:

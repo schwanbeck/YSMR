@@ -66,7 +66,7 @@ def track_bacteria(curr_path, settings=None):
     settings['include luminosity in tracking calculation']
     settings['list save length interval']
     settings['delete .csv file after analysis']
-    settings['evaluate files after analysis']
+    # settings['evaluate files after analysis']
     '''
     t_one_track_bacteria = datetime.now()
     if settings is None:
@@ -379,7 +379,7 @@ def track_bacteria(curr_path, settings=None):
         logger.critical('Error during read, stopping before evaluation. File: {}'.format(curr_path))
         return None
     else:
-        if settings['evaluate files after analysis']:
+        if True:  # settings['evaluate files after analysis']: @todo: change to combination check of plots/csv
             logger.info('Starting evaluation of file {}'.format(list_name))
             start_it_up(path_to_files=list_name,
                         df=df_for_eval,
