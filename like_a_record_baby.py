@@ -30,6 +30,7 @@ import pandas as pd
 import seaborn as sns
 from scipy.signal import medfilt
 from scipy.spatial import distance as dist
+from scipy import stats
 
 from helper_file import (
     _backup,
@@ -658,8 +659,8 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     settings['minimal length in seconds']
     settings['force tracking.ini fps settings']
     settings['limit track length to x seconds']
-    settings['extreme size outliers lower end in px']
-    settings['extreme size outliers upper end in px']
+    settings['extreme area outliers lower end in px*px']
+    settings['extreme area outliers upper end in px*px']
     settings['frame width']
     settings['frame height']
     settings['pixel per micrometre']
@@ -705,11 +706,12 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # change from sec to frames
     settings['minimal length in seconds'] = int(round(fps, 0) * settings['minimal length in seconds'])
     settings['limit track length to x seconds'] = int(round(fps, 0) * settings['limit track length to x seconds'])
-    if settings['extreme size outliers lower end in px'] >= settings['extreme size outliers upper end in px']:
+    if settings['extreme area outliers lower end in px*px'] >= settings['extreme area outliers upper end in px*px']:
         logger.critical('Minimal area exclusion in px^2 larger or equal to maximum; will not be able to find tracks. '
-                        'Please update tracking.ini. Min: {}, max: {}'.format(  # makes no sense to continue
-                         settings['extreme size outliers lower end in px'],
-                         settings['extreme size outliers upper end in px'])
+                        'Please update tracking.ini. extreme area outliers lower end in px*px: {}, '
+                        'extreme area outliers upper end in px*px: {}'.format(  # makes no sense to continue
+                         settings['extreme area outliers lower end in px*px'],
+                         settings['extreme area outliers upper end in px*px'])
                         )
         return None
     if frame_width is None or frame_height is None:
@@ -749,8 +751,8 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # Remove rough outliers
     df['average_area'] = df.groupby('TRACK_ID')['area'].transform('mean')
     df['area'] = np.where(
-        (df['average_area'] >= settings['extreme size outliers lower end in px']) &
-        (df['average_area'] <= settings['extreme size outliers upper end in px']),
+        (df['average_area'] >= settings['extreme area outliers lower end in px*px']) &
+        (df['average_area'] <= settings['extreme area outliers upper end in px*px']),
         df['area'],  # track is fine
         np.NaN  # delete otherwise
     )
@@ -991,10 +993,47 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     min_angle = settings['minimal angle in degrees for turning point']
     df['x_diff_track'] = df.groupby('TRACK_ID')['POSITION_X'].diff(angle_diff).fillna(method='bfill')
     df['y_diff_track'] = df.groupby('TRACK_ID')['POSITION_Y'].diff(angle_diff).fillna(method='bfill')
-    df['angle_calc'] = np.degrees(np.arctan2(df['x_diff_track'], df['y_diff_track']))
+    df['angle_radians'] = np.arctan2(df['x_diff_track'], df['y_diff_track'])
+    df['angle_calc'] = np.degrees(df['angle_radians'])
     df['angle_calc'] = abs(df.groupby('TRACK_ID')['angle_calc'].diff().fillna(0))
     df['angle_calc'] = np.where(360 - df['angle_calc'] <= df['angle_calc'], 360 - df['angle_calc'], df['angle_calc'])
     df['turn_points'] = np.where((df['angle_calc'] > min_angle) & (df['minimum'] == 1), 1, 0)
+
+    df.mulx = df.groupby('TRACK_ID')['POSITION_X'].prod(
+        df.groupby('TRACK_ID')['POSITION_X'].shift(periods=angle_diff).fillna(method='bfill'))
+    df.muly = df.groupby('TRACK_ID')['POSITION_Y'].prod(
+        df.groupby('TRACK_ID')['POSITION_Y'].shift(periods=angle_diff).fillna(method='bfill'))
+
+    df.mulx1y2 = df.groupby('TRACK_ID')['POSITION_X'].prod(
+        df.groupby('TRACK_ID')['POSITION_Y'].shift(periods=angle_diff).fillna(method='bfill'))
+    df.mulx2y1 = df.groupby('TRACK_ID')['POSITION_Y'].prod(
+        df.groupby('TRACK_ID')['POSITION_X'].shift(periods=angle_diff).fillna(method='bfill'))
+
+    df.dot = df.mulx + df.muly
+    df.det = df.mulx1y2 - df.mulx2y1
+
+    angle = np.arctan2(df.det, df.dot)
+    print(angle)
+    # get only angles where bacteria are motile by masking 'angle_radians' with 'minimum'
+    # np.ma.mask takes only values where mask is 0, so we need to switch 0 and 1
+    all_angles_radians = df['angle_radians'].to_numpy()[np.array(df['minimum'].to_numpy(), dtype=bool)]
+    # all_angles_radians = all_angles_radians[]
+
+    print(all_angles_radians)
+    print(stats.describe(all_angles_radians))
+    bins_number = 360
+    bins = np.linspace(-np.pi, np.pi, bins_number + 1)
+    n, _ = np.histogram(all_angles_radians, bins)
+    print(n)
+    # print(nnp)
+    plt.clf()
+    width = 2 * np.pi / bins_number
+    ax = plt.subplot(1, 1, 1, projection='polar')
+    bars = ax.bar(bins[:bins_number], n, width=width, bottom=0.0)
+    for bar in bars:
+        bar.set_alpha(0.5)
+    plt.show()
+    return None
 
     df['x_norm'] = (df['POSITION_X'].sub(df.groupby('TRACK_ID')['POSITION_X'].transform('first'))) / px_to_micrometre
     df['y_norm'] = (df['POSITION_Y'].sub(df.groupby('TRACK_ID')['POSITION_Y'].transform('first'))) / px_to_micrometre
@@ -1033,9 +1072,10 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
          speed_series,  # 2
          time_series,  # 3
          pdist_series,  # 4
-         motile_series  # 5
+         motile_series,  # 5
          ],
-        keys=name_of_columns, axis=1)
+        keys=name_of_columns, axis=1
+    )
     del turn_percent_series, dist_series, speed_series, time_series, pdist_series, motile_series
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
     # total count
@@ -1520,11 +1560,18 @@ if __name__ == '__main__':
     for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
         filler_for_logger += '#' * len(sub_string) + '\t'
     filler_for_logger = filler_for_logger[:-1]  # remove last tab
+    logger_main.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
     logger_main.debug('Logging test message')
 
     pool = mp.Pool()
-    main_files = find_paths(base_path='H:/Test/190430_Motility/test/',
+    main_files = find_paths(base_path='D:/Tracking_Test/',
                             extension='list.csv', minimal_age=0)
+    if not main_files:
+        logger_main.debug('No Paths provided.')
+        queue_listener.stop()
+        sys.exit()
+    for file in main_files:
+        logger_main.debug('{}'.format(file))
     main_folder_time = str(strftime('%y%m%d', localtime()))
     main_dir_form = '{}/{}_Results/'
     if isinstance(main_files, str) or isinstance(main_files, os.PathLike):
@@ -1549,7 +1596,8 @@ if __name__ == '__main__':
     logger_main.info('Paths: {}'.format(len(main_files)))
 
     for d in main_files:
-        pool.apply_async(start_it_up, args=(d,))
+        # pool.apply_async(start_it_up, args=(d,))
+        start_it_up(path_to_files=d, create_logger=False, settings=settings_)
     pool.close()
     pool.join()
     logger_main.debug('Elapsed time: {}'.format(elapsed_time(t_one)))

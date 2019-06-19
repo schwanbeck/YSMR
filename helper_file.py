@@ -98,8 +98,8 @@ def create_configs():
         'minimal length in seconds': 20,
         'limit track length to x seconds': 20,  # __RENAMED__
         'minimal angle in degrees for turning point': 30.0,  # __RENAMED__
-        'extreme size outliers lower end in px': 2,
-        'extreme size outliers upper end in px': 50,
+        'extreme area outliers lower end in px*px': 2,
+        'extreme area outliers upper end in px*px': 50,
     }
 
     _config['DISPLAY SETTINGS'] = {
@@ -118,7 +118,7 @@ def create_configs():
         'save rose plot': True,  # NEW
         'save time violin plot': True,  # NEW
         'save acr violin plot': False,  # NEW
-        'save distance violin plot': True,  # NEW
+        'save length violin plot': True,  # NEW
         'save turning point violin plot': True,  # NEW
         'save speed violin plot': True,  # NEW
         # @todo: group split selector / group split unit for violin plots
@@ -209,7 +209,7 @@ if not os.path.isfile('tracking.ini'):  # needed by later functions
 _config.read('tracking.ini')
 
 
-def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=20, time_delta_min=0):
+def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=0, time_delta_min=15):
     logger = logging.getLogger('ei').getChild(__name__)
     last_backup = _config['HOUSEKEEPING'].get('last backup')
     last_backup = datetime.strptime(last_backup, '%Y-%m-%d %H:%M:%S.%f')
@@ -220,8 +220,8 @@ def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=20, time_
         logger.info('Creating backup of program')
         src = os.getcwd()
         names = os.listdir(src)
-        now_folder = now.strftime('%y%m%d%H%M%S')  # y%m%d%H%M%S
-        dst = 'Q:/Code/{}'.format(now_folder)
+        now_folder = now.strftime('%y%m%d')  # y%m%d%H%M%S
+        dst = 'Q:/Code/{}/YSMR/'.format(now_folder)
         _mkdir(dst)
         ignore = shutil.ignore_patterns(
             '~$*', '._sync*', '.owncloud*', 'Thumbs.db', '*.tmp', 'desktop.ini',
@@ -474,10 +474,10 @@ def get_configs(tracking_ini_filepath=None):
             'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),  # __RENAMED__
             'minimal angle in degrees for turning point': basic_track.getfloat(
                 'minimal angle in degrees for turning point'),  # __RENAMED__
-            'extreme size outliers lower end in px': basic_track.getint(
-                'extreme size outliers lower end in px'),
-            'extreme size outliers upper end in px': basic_track.getint(
-                'extreme size outliers upper end in px'),
+            'extreme area outliers lower end in px*px': basic_track.getint(
+                'extreme area outliers lower end in px*px'),
+            'extreme area outliers upper end in px*px': basic_track.getint(
+                'extreme area outliers upper end in px*px'),
 
             # _config['DISPLAY SETTINGS']
             'user input': display.getboolean('user input'),
@@ -495,7 +495,7 @@ def get_configs(tracking_ini_filepath=None):
             'save rose plot': results.getboolean('save rose plot'),  # NEW
             'save time violin plot': results.getboolean('save time violin plot'),  # NEW
             'save acr violin plot': results.getboolean('save acr violin plot'),  # NEW
-            'save distance violin plot': results.getboolean('save distance violin plot'),  # NEW
+            'save length violin plot': results.getboolean('save length violin plot'),  # NEW
             'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
             'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
             # @todo:  .get(# @todo)split selector / group split unit for violin plots
