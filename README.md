@@ -4,6 +4,16 @@ Bacterial video tracking and analysis
 
 ## Installation
 
+### Dependencies
+Python 3.5 or higher
+#### Packages:
++ Matplotlib
++ Numpy
++ openCV v3 or v4; v2 untested (opencv-python or opencv-contrib-python)
++ Pandas
++ Scipy
++ Seaborn
+
 ## Usage
 
 ## Explanation of tracking.ini file
@@ -43,15 +53,15 @@ Explanation of each setting in the tracking.ini file and the initial default set
 ##### BASIC TRACK DATA ANALYSIS SETTINGS
 + minimal length in seconds : 20
 	+ Minimum time threshold for track analysis. All tracks shorter than this will be discarded. If set to 0, all tracks will be accepted. 
-	+ Accepts an integer value.
+	+ Accepts a floating point number.
 + limit track length to x seconds : 20
 	+ Setting the value to 0 will disable the truncation.
 	+ Maximum time for track analysis. All tracks longer than this will be truncated to the set time. If advanced track data analysis settings: 'track length exactly' is set to False (default) and the truncated track is not as long as the specified time due to holes in measurement, the nearest time point below the limit will be used instead. If 'track length exactly' is set to True, tracks that are shorter than the time specified after truncation will be discarded.  
-	+ Accepts an integer value.
+	+ Accepts a floating point number.
 + minimal angle in degrees for turning point : 30.0
 	+ Minimal change in angle (0° to 360°) between two positions in order to be declared a turning point.
 	+ The difference in frames between the two comparison points are defined under 'advanced track data analysis settings': 'compare angle between n frames'.
-	+ Accepts a floating point number between.
+	+ Accepts a floating point number.
 + extreme area outliers lower end in px*px : 2
 	+ Lower limit for area in pixel^2 which is not considered as bacteria. Tracks with an average area below this value will be discarded entirely in an initial step.
 	+ Accepts an integer value.
