@@ -84,7 +84,7 @@ def create_configs():
         pass
 
     _config['BASIC RECORDING SETTINGS'] = {
-        'video extension': '.mp4',
+        'video extension': '.wmv',
         'pixel per micrometre': 1.41888781,
         'frames per second': 30.0,
         'frame height': 922,
@@ -95,8 +95,8 @@ def create_configs():
     }
 
     _config['BASIC TRACK DATA ANALYSIS SETTINGS'] = {
-        'minimal length in seconds': 20,
-        'limit track length to x seconds': 20,  # __RENAMED__
+        'minimal length in seconds': 20.0,
+        'limit track length to x seconds': 20.0,  # __RENAMED__
         'minimal angle in degrees for turning point': 30.0,  # __RENAMED__
         'extreme area outliers lower end in px*px': 2,
         'extreme area outliers upper end in px*px': 50,
@@ -105,22 +105,23 @@ def create_configs():
     _config['DISPLAY SETTINGS'] = {
         'user input': True,
         'select files': True,
-        'display video analysis': False,  # __RENAMED__
+        'display video analysis': True,  # __RENAMED__
         'save video': False,
     }
 
     _config['RESULTS SETTINGS'] = {
         'rename previous result .csv': False,
-        'delete .csv file after analysis': True,
-        'store processed .csv file': False,  # NEW
-        'store generated statistical .csv file': False,  # NEW
-        'save large plots': False,  # __RENAMED__
+        'delete .csv file after analysis': False,
+        'store processed .csv file': True,  # NEW
+        'store generated statistical .csv file': True,  # NEW
+        'save large plots': True,  # __RENAMED__
         'save rose plot': True,  # NEW
         'save time violin plot': True,  # NEW
-        'save acr violin plot': False,  # NEW
+        'save acr violin plot': True,  # NEW
         'save length violin plot': True,  # NEW
         'save turning point violin plot': True,  # NEW
         'save speed violin plot': True,  # NEW
+        'save angle distribution plot / bins': 36,  # NEW
         # @todo: group split selector / group split unit for violin plots
     }
 
@@ -498,6 +499,7 @@ def get_configs(tracking_ini_filepath=None):
             'save length violin plot': results.getboolean('save length violin plot'),  # NEW
             'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
             'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
+            'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
             # @todo:  .get(# @todo)split selector / group split unit for violin plots
 
             # _config['LOGGING SETTINGS']

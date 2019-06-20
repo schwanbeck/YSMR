@@ -948,6 +948,23 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     df.reset_index(inplace=True)
     diff_tracks_start, track_change = different_tracks(df)
 
+    # @todo: allow user customisation of plot title name
+    # Set up plot title name
+    plot_title_name = file_name.replace('_', ' ')
+    plot_title_name = plot_title_name.split('.', 1)[0]
+    original_plot_date = plot_title_name[:12]
+    # Add time/date to title of plot; convenience for illiterate supervisors
+    if original_plot_date.isdigit():
+        plot_title_name = plot_title_name[12:]
+        try:
+            original_plot_date = strftime('%d. %m. \'%y, %H:%M:%S', strptime(str(original_plot_date), '%y%m%d%H%M%S'))
+        finally:
+            pass
+        plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
+    # Format general save path
+    plot_save_path = '{}{}'.format(daily_directory, file_name)
+    plot_save_path = plot_save_path + '_{}.png'
+
     # set up some overall values
     if settings['verbose']:
         logger.debug('Calculating x_delta, y_delta, t_delta, travelled_dist')
@@ -988,52 +1005,46 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     for kernel_size in [3, max_kernel]:
         df['minimum'] = df.groupby('TRACK_ID')['minimum'].transform(medfilt, kernel_size=kernel_size)
     np.put(df['minimum'], diff_tracks_start, 0)
-
     angle_diff = settings['compare angle between n frames']
+
+    x_diff_track_for_angle = df.groupby('TRACK_ID')['POSITION_X'].diff(angle_diff)  # .fillna(method='bfill')
+    y_diff_track_for_angle = df.groupby('TRACK_ID')['POSITION_Y'].diff(angle_diff)  # .fillna(method='bfill')
+    angle_radians = np.arctan2(x_diff_track_for_angle, y_diff_track_for_angle)
+
+    # Angle distribution histogram
+    if settings['save angle distribution plot / bins']:
+        # Create array with average motility percentage per track
+        average_minimum_groups = df.groupby('TRACK_ID')['minimum']
+        min_average = np.repeat(average_minimum_groups.mean().to_numpy(), average_minimum_groups.count().to_numpy())
+
+        # Kick out all tracks with less than 70 % motility for
+        angle_radians_minimum = np.where(
+            min_average > 0.7,
+            df['minimum'],
+            0
+        )
+        all_angles_radians = angle_radians[np.array(angle_radians_minimum, dtype=bool)]
+        # all_angles_radians = all_angles_radians[]
+        # print(stats.describe(all_angles_radians, nan_policy='omit'))
+        bins_number = settings['save angle distribution plot / bins']
+        bins = np.linspace(-np.pi, np.pi, bins_number + 1)
+        n, _ = np.histogram(all_angles_radians, bins)
+        plt.clf()
+        width = 2 * np.pi / bins_number
+        plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
+        ax = plt.subplot(1, 1, 1, projection='polar')
+        bars = ax.bar(bins[:bins_number], n, width=width, bottom=0.0)
+        for bar in bars:
+            bar.set_alpha(0.5)
+        plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
+        plt.savefig(plot_save_path.format('angle_histogram'), dpi=300)
+        logger.info('Saving figure {}'.format(plot_save_path.format('angle_histogram')))
+        plt.close()
     min_angle = settings['minimal angle in degrees for turning point']
-    df['x_diff_track'] = df.groupby('TRACK_ID')['POSITION_X'].diff(angle_diff).fillna(method='bfill')
-    df['y_diff_track'] = df.groupby('TRACK_ID')['POSITION_Y'].diff(angle_diff).fillna(method='bfill')
-    df['angle_radians'] = np.arctan2(df['x_diff_track'], df['y_diff_track'])
-    df['angle_calc'] = np.degrees(df['angle_radians'])
+    df['angle_calc'] = np.degrees(angle_radians)
     df['angle_calc'] = abs(df.groupby('TRACK_ID')['angle_calc'].diff().fillna(0))
     df['angle_calc'] = np.where(360 - df['angle_calc'] <= df['angle_calc'], 360 - df['angle_calc'], df['angle_calc'])
     df['turn_points'] = np.where((df['angle_calc'] > min_angle) & (df['minimum'] == 1), 1, 0)
-
-    df.mulx = df.groupby('TRACK_ID')['POSITION_X'].prod(
-        df.groupby('TRACK_ID')['POSITION_X'].shift(periods=angle_diff).fillna(method='bfill'))
-    df.muly = df.groupby('TRACK_ID')['POSITION_Y'].prod(
-        df.groupby('TRACK_ID')['POSITION_Y'].shift(periods=angle_diff).fillna(method='bfill'))
-
-    df.mulx1y2 = df.groupby('TRACK_ID')['POSITION_X'].prod(
-        df.groupby('TRACK_ID')['POSITION_Y'].shift(periods=angle_diff).fillna(method='bfill'))
-    df.mulx2y1 = df.groupby('TRACK_ID')['POSITION_Y'].prod(
-        df.groupby('TRACK_ID')['POSITION_X'].shift(periods=angle_diff).fillna(method='bfill'))
-
-    df.dot = df.mulx + df.muly
-    df.det = df.mulx1y2 - df.mulx2y1
-
-    angle = np.arctan2(df.det, df.dot)
-    print(angle)
-    # get only angles where bacteria are motile by masking 'angle_radians' with 'minimum'
-    # np.ma.mask takes only values where mask is 0, so we need to switch 0 and 1
-    all_angles_radians = df['angle_radians'].to_numpy()[np.array(df['minimum'].to_numpy(), dtype=bool)]
-    # all_angles_radians = all_angles_radians[]
-
-    print(all_angles_radians)
-    print(stats.describe(all_angles_radians))
-    bins_number = 360
-    bins = np.linspace(-np.pi, np.pi, bins_number + 1)
-    n, _ = np.histogram(all_angles_radians, bins)
-    print(n)
-    # print(nnp)
-    plt.clf()
-    width = 2 * np.pi / bins_number
-    ax = plt.subplot(1, 1, 1, projection='polar')
-    bars = ax.bar(bins[:bins_number], n, width=width, bottom=0.0)
-    for bar in bars:
-        bar.set_alpha(0.5)
-    plt.show()
-    return None
 
     df['x_norm'] = (df['POSITION_X'].sub(df.groupby('TRACK_ID')['POSITION_X'].transform('first'))) / px_to_micrometre
     df['y_norm'] = (df['POSITION_Y'].sub(df.groupby('TRACK_ID')['POSITION_Y'].transform('first'))) / px_to_micrometre
@@ -1161,23 +1172,6 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     df['distance_colour'] = df.groupby('TRACK_ID')['travelled_dist'].transform('sum') - distance_min
     df['distance_colour'] = df['distance_colour'] / df['distance_colour'].max()
 
-    # @todo: allow user customisation of plot title name
-    # Set up plot title name
-    plot_title_name = file_name.replace('_', ' ')
-    plot_title_name = plot_title_name.split('.', 1)[0]
-    original_plot_date = plot_title_name[:12]
-    # Add time/date to title of plot; convenience for illiterate supervisors
-    if original_plot_date.isdigit():
-        plot_title_name = plot_title_name[12:]
-        try:
-            # original_plot_date_as_time_object = strptime(str(original_plot_date), '%y%m%d%H%M%S')
-            original_plot_date = strftime('%d. %m. \'%y, %H:%M:%S', strptime(str(original_plot_date), '%y%m%d%H%M%S'))
-        except (ValueError, TypeError) as time_val_error:
-            logger.exception(time_val_error)
-        finally:
-            pass
-        plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
-
     plt.rcParams.update({'font.size': 8})
     plt.rcParams['axes.axisbelow'] = True
     if settings['save large plots']:
@@ -1214,9 +1208,9 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             )
         del grouped_df
         plt.title('{} Track count: {}'.format(plot_title_name, len(track_change)))
-        plot_save_path = '{}{}_Bac_Run_Overview.png'.format(daily_directory, file_name)
-        plt.savefig(plot_save_path, dpi=300)
-        logger.info('Saving figure {}'.format(plot_save_path))
+        # plot_save_path = '{}{}_Bac_Run_Overview.png'.format(daily_directory, file_name)
+        plt.savefig(plot_save_path.format('_Bac_Run_Overview'), dpi=300)
+        logger.info('Saving figure {}'.format(plot_save_path.format('_Bac_Run_Overview')))
         plt.close()
 
     f = plt.figure()
