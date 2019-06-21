@@ -1032,6 +1032,8 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         width = 2 * np.pi / bins_number
         plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
         ax = plt.subplot(1, 1, 1, projection='polar')
+        ax.set_theta_zero_location("N")  # theta=0 at the top
+        ax.set_theta_direction(-1)  # theta increasing clockwise
         bars = ax.bar(bins[:bins_number], n, width=width, bottom=0.0)
         for bar in bars:
             bar.set_alpha(0.5)
