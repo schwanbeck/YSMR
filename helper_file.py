@@ -263,30 +263,31 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
     if file_size < max_size:
         if 0 < file_size:  # if the file already contains lines, check if we start on an empty line
             logfile_padding(path)  # or pad it with empty lines
-        return path
-    base_path, file_name = os.path.split(path)
-    old_paths = find_paths(base_path=base_path, extension='{}.*'.format(file_name), recursive=False)
-    if old_paths:  # rename old files from .log.1 to .log.9; delete otherwise
-        old_paths = sorted(old_paths, reverse=True, key=lambda x: int(x[-1]))
-        counts = [int(count[-1]) for count in old_paths]
-        if not counts[-1] > 1:  # if smallest number isn't 1, we can stop
-            max_idx = [1]
-            max_idx.extend([s - t for s, t in zip(counts[:-1], counts[1:])])
-            max_idx = np.array(max_idx).argmax()  # look for a gap in the numbering
-            for old_count, old_path in zip(counts[max_idx:], old_paths[max_idx:]):
-                try:
-                    if old_count == 9:
-                        os.remove(old_path)
-                    else:
-                        new_path = '{}{}'.format(old_path[:-1], old_count + 1)
-                        if not os.path.isfile(new_path):
-                            os.rename(old_path, new_path)
-                finally:
-                    pass
-    try:
-        os.rename(path, '{}.1'.format(path))
-    finally:
-        return path
+    else:
+        base_path, file_name = os.path.split(path)
+        old_paths = find_paths(base_path=base_path, extension='{}.*'.format(file_name), recursive=False)
+        if old_paths:  # rename old files from .log.1 to .log.9; delete otherwise
+            old_paths = sorted(old_paths, reverse=True, key=lambda x: int(x[-1]))
+            counts = [int(count[-1]) for count in old_paths]
+            if not counts[-1] > 1:  # if smallest number isn't 1, we can stop
+                max_idx = [1]
+                max_idx.extend([s - t for s, t in zip(counts[:-1], counts[1:])])
+                max_idx = np.array(max_idx).argmax()  # look for a gap in the numbering
+                for old_count, old_path in zip(counts[max_idx:], old_paths[max_idx:]):
+                    try:
+                        if old_count == 9:
+                            os.remove(old_path)
+                        else:
+                            new_path = '{}{}'.format(old_path[:-1], old_count + 1)
+                            if not os.path.isfile(new_path):
+                                os.rename(old_path, new_path)
+                    finally:
+                        pass
+        try:
+            os.rename(path, '{}.1'.format(path))
+        except (FileNotFoundError, FileExistsError):
+            pass
+    return path
 
 
 def creation_date(path_to_file):
@@ -726,11 +727,9 @@ def reshape_result(tuple_of_tuples, *args):
     return tuple(coordinates), additional_info
 
 
-def save_list(file_path, filename, coords=None, get_name=False, first_call=False, rename_old_list=True):
+def save_list(file_path, filename, coords=None, first_call=False, rename_old_list=True):
     logger_save_list = logging.getLogger('ei.' + __name__)
     file_csv = '{}/{}_list.csv'.format(file_path, filename)
-    if get_name:
-        return file_csv  # return name, stop function
 
     if first_call:  # set up .csv file
         old_list = False
@@ -746,7 +745,7 @@ def save_list(file_path, filename, coords=None, get_name=False, first_call=False
                 os.remove(file_csv)
         with open(file_csv, 'w+', newline='') as file:
             file.write('TRACK_ID,POSITION_T,POSITION_X,POSITION_Y,WIDTH,HEIGHT,DEGREES_ANGLE\n')  # first row
-        return old_list  # return state of old_list, stop function
+        return old_list, file_csv
 
     if coords:  # Check if we actually received something
         string_holder = ''  # Create empty string to which rows are appended
@@ -766,6 +765,7 @@ def save_list(file_path, filename, coords=None, get_name=False, first_call=False
             string_holder += curr_string  # append row
         with open(file_csv, 'a', newline='') as file:  # append rows to .csv file
             file.write(string_holder)
+    return None, None
 
 
 def set_different_colour_filter(colour_filter_new):

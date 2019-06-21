@@ -66,7 +66,6 @@ class CentroidTracker:
         if len(rects) == 0:
             # loop over any existing tracked objects and mark them
             # as disappeared
-            # @todo: got a RuntimeError: OrderedDict mutated during iteration; test if list() helps
             # for object_id in self.disappeared.keys():
             for object_id in list(self.disappeared.keys()):
                 self.disappeared[object_id] += 1

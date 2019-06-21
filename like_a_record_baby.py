@@ -30,7 +30,7 @@ import pandas as pd
 import seaborn as sns
 from scipy.signal import medfilt
 from scipy.spatial import distance as dist
-from scipy import stats
+# from scipy import stats
 
 from helper_file import (
     _backup,
@@ -115,12 +115,11 @@ def track_bacteria(curr_path, settings=None):
         pass
 
     pathname, filename = os.path.split(curr_path)
-    list_name = save_list(get_name=True, file_path=pathname, filename=filename)
     logger.info('Starting with file {}'.format(curr_path))
 
     # Set initial values; initialise result list
-    old_list = save_list(file_path=pathname, filename=filename,
-                         first_call=True, rename_old_list=settings['rename previous result .csv'])
+    old_list, list_name = save_list(file_path=pathname, filename=filename,
+                                    first_call=True, rename_old_list=settings['rename previous result .csv'])
     # Save old_list_name for later if it exists; False otherwise
     ct = CentroidTracker()  # Initialise tracker instance
     coords = []  # Empty list to store calculated coordinates
@@ -1029,7 +1028,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         bins_number = settings['save angle distribution plot / bins']
         bins = np.linspace(-np.pi, np.pi, bins_number + 1)
         n, _ = np.histogram(all_angles_radians, bins)
-        plt.clf()
+        # plt.clf()
         width = 2 * np.pi / bins_number
         plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
         ax = plt.subplot(1, 1, 1, projection='polar')
@@ -1040,6 +1039,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         plt.savefig(plot_save_path.format('angle_histogram'), dpi=300)
         logger.info('Saving figure {}'.format(plot_save_path.format('angle_histogram')))
         plt.close()
+
     min_angle = settings['minimal angle in degrees for turning point']
     df['angle_calc'] = np.degrees(angle_radians)
     df['angle_calc'] = abs(df.groupby('TRACK_ID')['angle_calc'].diff().fillna(0))
