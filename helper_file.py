@@ -80,7 +80,7 @@ def create_configs():
         old_tracking_ini = '{}.{}'.format(configfilepath, datetime.now().strftime('%y%m%d%H%M%S'))
         os.rename(configfilepath, old_tracking_ini)
         logger.critical('Old tracking.ini renamed to {}'.format(old_tracking_ini))
-    finally:
+    except FileNotFoundError:
         pass
 
     _config['BASIC RECORDING SETTINGS'] = {
