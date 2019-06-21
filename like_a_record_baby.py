@@ -124,7 +124,7 @@ def track_bacteria(curr_path, settings=None):
     ct = CentroidTracker()  # Initialise tracker instance
     coords = []  # Empty list to store calculated coordinates
     curr_frame_count = 0
-    # threshold_list = []
+    threshold_list = []
     # skip_frames = 0
     total_threshold = 0  # Detection threshold total at which gray value bacteria are detected;
     # calculated differently depending on white_bac_on_black_bgr
@@ -188,35 +188,32 @@ def track_bacteria(curr_path, settings=None):
 
         gray = cv2.cvtColor(frame, settings['color filter'])  # Convert to gray scale
 
-        if curr_frame_count <= settings['minimal frame count'] or curr_frame_count <= 20 * fps_of_file:
-            # or <= 20 * fps in case a low threshold was specified
-            # set threshold adaptively @todo: + skip_frames
-            mean, stddev = cv2.meanStdDev(gray)
-            if settings['white bacteria on dark background']:
-                curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
-                total_threshold += curr_frame_threshold
-                # Bacteria are brighter than background
-            else:
-                curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
-                total_threshold += curr_frame_threshold
-                # Bacteria are darker than background
-                # It's sadly not simply (255 - threshold)
+        # if curr_frame_count <= settings['minimal frame count'] or curr_frame_count <= 20 * fps_of_file:
+        # the 'or <= 20 * fps' in case a low threshold was specified
+        # set threshold adaptively
+        mean, stddev = cv2.meanStdDev(gray)
+        if settings['white bacteria on dark background']:
+            curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
+            # total_threshold += curr_frame_threshold
+            # Bacteria are brighter than background
+        else:
+            curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
+            # total_threshold += curr_frame_threshold
+            # Bacteria are darker than background
+            # It's sadly not simply (255 - threshold)
+        # Non-moving-average version:
+        # curr_threshold = int(total_threshold / (curr_frame_count + 1))  # average input  - skip_frames
 
-            # Moving average with list:
-            # threshold_list.append(curr_frame_threshold)
-            # curr_threshold = int(sum(threshold_list) / len(threshold_list))
-            # if len(threshold_list) > fps_of_file * 20:
-            #     threshold_list = threshold_list[1:]
+        # 5 s moving average with list:
+        threshold_list.append(curr_frame_threshold)
+        curr_threshold = int(sum(threshold_list) / len(threshold_list))
+        if len(threshold_list) > fps_of_file * 5:
+            del threshold_list[0]
 
-            curr_threshold = int(total_threshold / (curr_frame_count + 1))  # average input  - skip_frames
-            # if your threshold is not ok after 20 s either install
-            # a new power source/lamp in your microscope or
-            # stop fiddling with brightness during recording
-            # Usually stable after ~2 frames
-            if curr_frame_count == settings['minimal frame count']:
-                logger.debug('Background threshold level: {} (of 255), '
-                             'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
-                              curr_threshold, mean.item(), stddev.item(), settings['threshold offset for detection']))
+        if curr_frame_count == settings['minimal frame count']:
+            logger.debug('Background threshold level: {} (of 255), '
+                         'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
+                          curr_threshold, mean.item(), stddev.item(), settings['threshold offset for detection']))
         # various other tries to optimise threshold:
         # blurred = cv2.bilateralFilter(gray, 3, 75, 75)
         # equ = clahe.apply(gray)  # uncomment clahe above; background removal
