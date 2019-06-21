@@ -1016,31 +1016,34 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         average_minimum_groups = df.groupby('TRACK_ID')['minimum']
         min_average = np.repeat(average_minimum_groups.mean().to_numpy(), average_minimum_groups.count().to_numpy())
 
-        # Kick out all tracks with less than 70 % motility for
+        # Kick out all tracks with less than 70 % motility
         angle_radians_minimum = np.where(
             min_average > 0.7,
             df['minimum'],
             0
         )
-        all_angles_radians = angle_radians[np.array(angle_radians_minimum, dtype=bool)]
-        # all_angles_radians = all_angles_radians[]
-        # print(stats.describe(all_angles_radians, nan_policy='omit'))
-        bins_number = settings['save angle distribution plot / bins']
-        bins = np.linspace(-np.pi, np.pi, bins_number + 1)
-        n, _ = np.histogram(all_angles_radians, bins)
-        # plt.clf()
-        width = 2 * np.pi / bins_number
-        plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
-        ax = plt.subplot(1, 1, 1, projection='polar')
-        ax.set_theta_zero_location("N")  # theta=0 at the top
-        ax.set_theta_direction(-1)  # theta increasing clockwise
-        bars = ax.bar(bins[:bins_number], n, width=width, bottom=0.0)
-        for bar in bars:
-            bar.set_alpha(0.5)
-        plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
-        plt.savefig(plot_save_path.format('angle_histogram'), dpi=300)
-        logger.info('Saving figure {}'.format(plot_save_path.format('angle_histogram')))
-        plt.close()
+        if angle_radians_minimum.sum():  # If there are any data points (0 == False):
+            all_angles_radians = angle_radians[np.array(angle_radians_minimum, dtype=bool)]
+            # all_angles_radians = all_angles_radians[]
+            # print(stats.describe(all_angles_radians, nan_policy='omit'))
+            bins_number = settings['save angle distribution plot / bins']
+            bins = np.linspace(-np.pi, np.pi, bins_number + 1)
+            hist_array, _ = np.histogram(all_angles_radians, bins)
+            # plt.clf()
+            plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
+            ax = plt.subplot(1, 1, 1, projection='polar')
+            ax.set_theta_zero_location("N")  # theta=0 at the top
+            ax.set_theta_direction(-1)  # theta increasing clockwise
+            width = 2 * np.pi / bins_number
+            bars = ax.bar(bins[:bins_number], hist_array, width=width, bottom=0.0)
+            for bar in bars:
+                bar.set_alpha(0.5)
+            plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
+            plt.savefig(plot_save_path.format('angle_histogram'), dpi=300)
+            logger.info('Saving figure {}'.format(plot_save_path.format('angle_histogram')))
+            plt.close()
+        else:
+            logger.warning('Cannot create angle distribution plot as there are no motile tracks.')
 
     min_angle = settings['minimal angle in degrees for turning point']
     df['angle_calc'] = np.degrees(angle_radians)
