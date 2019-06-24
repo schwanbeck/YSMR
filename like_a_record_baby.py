@@ -114,7 +114,8 @@ def track_bacteria(curr_path, settings=None):
     finally:
         pass
 
-    pathname, filename = os.path.split(curr_path)
+    pathname, filename_ext = os.path.split(curr_path)
+    filename = os.path.splitext(filename_ext)[0]
     logger.info('Starting with file {}'.format(curr_path))
 
     # Set initial values; initialise result list
@@ -126,17 +127,17 @@ def track_bacteria(curr_path, settings=None):
     curr_frame_count = 0
     threshold_list = []
     # skip_frames = 0
-    total_threshold = 0  # Detection threshold total at which gray value bacteria are detected;
+    # total_threshold = 0  # Detection threshold total at which gray value bacteria are detected;
     # calculated differently depending on white_bac_on_black_bgr
     fps_total = []  # List of calculated fps
-    curr_threshold = 0  # Current threshold (calculated on the first 600 frames; thereafter left as is)
+    # curr_threshold = 0  # Current threshold (calculated on the first 600 frames; thereafter left as is)
     error_during_read = False  # Set to true if some errors occur; used to restore old list afterwards if it exists
     (objects, degrees) = (None, None)  # reset objects, additional_info (probably useless but doesn't hurt)
 
     if settings['debugging'] and settings['display video analysis']:
         # Display first frame in case frame-by-frame analysis is necessary
         ret, frame = cap.read()
-        cv2.imshow('{}'.format(filename), frame)
+        cv2.imshow('{}'.format(filename_ext), frame)
     (frame_height, frame_width) = (int(cap.get(4)),
                                    int(cap.get(3)))  # Image dimensions
     if settings['verbose']:
@@ -169,7 +170,7 @@ def track_bacteria(curr_path, settings=None):
         if not ret and (frame_count == curr_frame_count + 1 or  # some file formats skip one frame
                         frame_count == curr_frame_count) and frame_count >= settings['minimal frame count']:
             # If a frame could not be retrieved and the minimum frame nr. has been reached
-            logger.info('Frames from file {} read.'.format(filename))
+            logger.info('Frames from file {} read.'.format(filename_ext))
             break
         elif not ret:  # Something must've happened, user decides if to proceed
             logger.critical('Error during cap.read() with file {}'.format(curr_path))
@@ -331,7 +332,7 @@ def track_bacteria(curr_path, settings=None):
                         (50, 50, 170),  # colour
                         2  # line thickness
                         )
-            cv2.imshow('{}'.format(filename), frame)  # Display the image
+            cv2.imshow('{}'.format(filename_ext), frame)  # Display the image
             if cv2.waitKey(1) & 0xFF == ord('q'):  # Interrupt display on 'q'-keypress
                 error_during_read = True
                 logger.error('Processing file interrupted by user: {}'.format(curr_path))
@@ -432,23 +433,22 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
     return_result = []
     sub_part = []
     # Too short tracks aren't useful and can immediately be discarded
-    if size >= settings['minimal length in seconds']:  # 20s @30 fps  # :(2.5 * 30)
-        # Do not allow tracking holes for more than 4 frames, try to find useful halves otherwise
+    if size >= settings['minimal length in seconds']:  # as corrected to frames from fps * s
+        # Do not allow tracking holes for more than n frames, try to find useful halves otherwise
         kick_reason -= 1
         # We keep df_passed for later
         df = df_passed.iloc[start:stop + 1]  # iloc upper range in slice is exclusive
-        size = df.shape[0]  # reassigned just in case
+        size = df.shape[0]
         look_for_holes = df['POSITION_T'].diff()
         if look_for_holes.max() <= settings['maximal consecutive holes']:
             kick_reason -= 1
             # Check if there are no outliers (at pos. 0 would be ok)
             if df['distance'].sum() == 0:
                 kick_reason -= 1
-                # remove tracks with too big holes (>=5%)
+                # remove tracks with too big holes (>=n%)
                 # calculate difference between first and last frame
                 duration = df['POSITION_T'].iloc[-1] - df['POSITION_T'].iloc[0] + 1  # avoid off-by-one error
                 duration_size_ratio = duration / size
-                # logger.debug(duration_size_ratio)
                 if duration_size_ratio < settings['maximal empty frames in %']:
                     kick_reason -= 1
                     # Average area should be within 0.1/0.9 quartile
@@ -505,144 +505,6 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
         # Get the smallest kick reason (default kick_reason, but sub-part might've gotten further)
         kick_reason = min(kick_reason_list)
     return return_result, kick_reason
-
-
-def single_plots_in_your_area(df, plot_name, px_to_micrometre, offset=0, period=1, fps=30):
-    logger = logging.getLogger('ei').getChild(__name__)
-    logger.debug('Creating single track displays')
-    # Base values
-    # moving_average = 10
-    # avg_mask = np.ones(moving_average) / moving_average
-    # colors = get_colour_map(counts=6)
-    # if list_of_selected_plots is None:
-    df.reset_index(inplace=True)
-    diff_tracks_start, diff_tracks = different_tracks(df)
-    list_of_selected_plots = []
-    for idx in range(0, len(diff_tracks)):
-        if idx == 0:
-            list_of_selected_plots.append((0, diff_tracks[idx]))
-        else:
-            list_of_selected_plots.append((diff_tracks[idx - 1] + 1, diff_tracks[idx]))
-    df['travelled_dist'] = np.sqrt(np.square(df['x_delta']) + np.square(df['y_delta'])) / px_to_micrometre
-    # df.loc[df['travelled_dist'].isnull(), ['travelled_dist']] = 0
-    # np.put(df['travelled_dist'], diff_tracks_start, 0)
-    df['travelled_dist'] = df['travelled_dist'] / df['t_delta']
-    # Initialise plots
-    fig, plots = plt.subplots(len(list_of_selected_plots), 2, gridspec_kw={'width_ratios': [5, 1]})  #
-    fig.set_size_inches(11.6929133858, 11.6929133858)  # (8.2677165354, 11.6929133858)
-
-    # angle_diff = 10
-    min_angle = 30
-
-    df['x_stop'] = np.where(df['minimum'] == 0, df['POSITION_X'], np.NaN)
-    df['y_stop'] = np.where(df['minimum'] == 0, df['POSITION_Y'], np.NaN)
-
-    df['x_change'] = np.where((df['angle_calc'] > min_angle) & (df['minimum'] == 1),
-                              df['POSITION_X'], np.NaN)
-    df['y_change'] = np.where((df['angle_calc'] > min_angle) & (df['minimum'] == 1),
-                              df['POSITION_Y'], np.NaN)
-
-    # Go through selected plots
-    for idx, (start, stop) in enumerate(list_of_selected_plots):
-        # Select df
-        df_curr = df.loc[start:stop].copy()
-        # Cumulative distance
-
-        df_curr['cum_sum'] = df_curr.loc[:, ['travelled_dist']].cumsum()
-        # Velocity
-        df_curr['velocity'] = df_curr['travelled_dist']
-        df_curr['velocity'] = np.where(df_curr['travelled_dist'] > 10 ** -3, df_curr['travelled_dist'], 0)
-        # df_curr.loc[start, ['velocity']] = 0
-        # df_curr.loc[df_curr['velocity'].isnull(), ['velocity']] = 0
-        for kernel_size in [3, 31]:  # range(0, 3):
-            df_curr['velocity'] = medfilt(df_curr['velocity'], kernel_size=kernel_size)
-
-        df_curr.loc[start, ['velocity']] = 0
-        change_array = df_curr['velocity'].values
-        # start / stop
-        change_to_move = np.where(
-            (change_array[:-1] != change_array[1:]) &
-            (change_array[:-1] == 0)
-        )[0]
-
-        change_to_stop = np.where(
-            (change_array[:-1] != change_array[1:]) &
-            (change_array[1:] == 0)
-        )[0]
-        # Acceleration
-        # df_curr['acceleration'] = df_curr.loc[:, ['velocity']].diff()
-        # df_curr.loc[df_curr['acceleration'].isnull(), ['acceleration']] = 0
-        # df_curr['acceleration'] = np.convolve(df_curr['acceleration'], avg_mask, 'same')
-        # df_curr['acceleration'] = np.convolve(df_curr['acceleration'], avg_mask, 'same')
-        # df_curr.loc[start, ['acceleration']] = 0
-
-        t = [t - df_curr.loc[start, 'POSITION_T'] for t in df_curr['POSITION_T'].array]  # Set t0 to 0
-        x = df_curr['POSITION_X']
-        y = df_curr['POSITION_Y']
-        x_change = df_curr['x_change']
-        y_change = df_curr['y_change']
-        x_stop = df_curr['x_stop']
-        y_stop = df_curr['y_stop']
-
-        # d = df_curr['cum_sum']
-        v = df_curr['velocity']
-        # a = df_curr['acceleration']
-
-        angle = df_curr['angle_calc']
-
-        ax, bx = plots[idx]
-        color = 'tab:blue'
-        if idx == len(list_of_selected_plots) - 1:
-            ax.set_xlabel('time ({:.2f} s)'.format(1 / fps * period))
-        ax.set_ylabel('velocity', color=color)
-        ax.plot(t[:], v, color=color)
-        ax.axvline(x=offset, color='black', alpha=0.5)
-
-        for change in change_to_move:
-            ax.axvline(t[change], color='green', alpha=0.7)
-        for change in change_to_stop:
-            ax.axvline(t[change], color='red', alpha=0.7)
-        ax.axhline(y=0, color=color, alpha=0.5)
-        ax.tick_params(axis='y', labelcolor=color)
-
-        # color = 'tab:blue'
-        # ax1 = ax.twinx()
-        # ax1.set_ylabel('velocity', color=color)
-        # ax1.axhline(y=0, color=color, alpha=0.5)
-        # ax1.plot(t, v, color=color)
-        # ax1.tick_params(axis='y', labelcolor=color)
-
-        color = 'tab:green'
-        ax2 = ax.twinx()
-        ax2.set_ylabel('angle', color=color)
-        q_low, q_high = angle.quantile(q=(0.25, 0.75))
-        ax2.axhline(y=q_low, color=color, alpha=0.5)
-        ax2.axhline(y=q_high, color=color, alpha=0.5)
-        ax2.axhline(y=+.00, color=color, alpha=0.5)
-        ax2.axhline(y=min_angle, color=color, alpha=0.5)
-        ax2.set_ylim([0, 181])
-        # ax2.axhline(y=+.15, color=color, alpha=0.5)
-        # ax2.axhline(y=-.15, color=color, alpha=0.5)
-        ax2.plot(t, angle, color=color)
-        ax2.tick_params(axis='y', labelcolor=color)
-
-        color = 'blue'
-        bx.plot(x, y, color=color)
-        bx.scatter(x[start + offset], y[start + offset], color='pink',
-                   zorder=0)
-        bx.scatter(x_change, y_change, color='orange',  # [start + period + offset]
-                   marker='o', facecolors='none', zorder=2)
-        bx.scatter(x_stop, y_stop, color='red',  # [start + period + offset]
-                   marker='.',  # facecolors='none',
-                   zorder=1)
-        bx.axis('equal')
-
-    fig.tight_layout()
-    logger.debug('Saving single plots: {}'.format(plot_name))
-    plt.savefig(plot_name, dpi=300)
-    # plt.show()
-    plt.close()
-    return
 
 
 def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
@@ -871,7 +733,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         if not good_track_result:
             continue
         # get longest track from good_track_result:
-        good_selection = 0
+        good_selection = 0  # @todo: allow switch between longest/first fragment
         if len(good_track_result) > 1:
             good_comparator = 0
             for idx_good, (good_start, good_stop) in enumerate(good_track_result):
@@ -928,8 +790,9 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     if not good_track:  # If we are left with no tracks, we can stop here
         end_string = 'File {} has no acceptable tracks.'.format(path_to_file)
         logger.warning(end_string)
-        return end_string
-    # Convert good_track to list for use with np.put (a lot quicker than setting slices of np.array to true)
+        return None
+    # Convert good_track to list for use with np.put
+    # (a lot faster than setting slices of np.array to true for some reason)
     df['good_track'] = np.zeros(df.shape[0], dtype=np.int8)
     set_good_track_to_true = []
     for (start, stop) in good_track:
@@ -940,14 +803,17 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # Reset df to important bits
     if settings['verbose']:
         logger.debug('Resetting df')
-    df = df.loc[df['good_track'] == 1, ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', ]]
+    df_passed_columns = ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', ]
+    if settings['store processed .csv file']:  # otherwise no longer needed
+        df_passed_columns.extend(['WIDTH', 'HEIGHT', ])
+    df = df.loc[df['good_track'] == 1, df_passed_columns]
     df.reset_index(inplace=True)
     diff_tracks_start, track_change = different_tracks(df)
 
     # @todo: allow user customisation of plot title name
     # Set up plot title name
     plot_title_name = file_name.replace('_', ' ')
-    plot_title_name = plot_title_name.split('.', 1)[0]
+    plot_title_name = plot_title_name.split(sep='.', maxsplit=1)[0]
     original_plot_date = plot_title_name[:12]
     # Add time/date to title of plot; convenience for illiterate supervisors
     if original_plot_date.isdigit():
@@ -957,9 +823,17 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         finally:
             pass
         plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
+
+    if len(plot_title_name) > 90:
+        plot_title_name_len_half = int(0.5 * len(plot_title_name))
+        plot_title_name_a = plot_title_name[:plot_title_name_len_half]
+        plot_title_name_b = plot_title_name[plot_title_name_len_half:]
+        plot_title_name_c, plot_title_name_d = plot_title_name_b.split(sep=' ', maxsplit=1)
+        plot_title_name = '{}{}\n{}'.format(plot_title_name_a, plot_title_name_c, plot_title_name_d)
+
     # Format general save path
-    plot_save_path = '{}{}'.format(daily_directory, file_name)
-    plot_save_path = plot_save_path + '_{}.png'
+    save_path = '{}{}'.format(daily_directory, file_name)
+    save_path = save_path + '_{}{}'
 
     # set up some overall values
     if settings['verbose']:
@@ -979,8 +853,9 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
                             'clean-up at position(s): {}'.format(item, np.where(df[item].isnull())[0]))
             logger.critical('{} track starts: {}'.format(item, diff_tracks_start))
 
-    df['POSITION_T'] = df['POSITION_T'].sub(df.groupby('TRACK_ID')['POSITION_T'].transform('first')).astype(np.int32)
-    if any(df['POSITION_T'] < 0):  # validate
+    df['t_norm'] = df['POSITION_T'].sub(
+        df.groupby('TRACK_ID')['POSITION_T'].transform('first')).astype(np.int32)
+    if any(df['t_norm'] < 0):  # validate
         logger.critical('POSITION_T contains negative values')
         return None
 
@@ -1013,15 +888,14 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         average_minimum_groups = df.groupby('TRACK_ID')['minimum']
         min_average = np.repeat(average_minimum_groups.mean().to_numpy(), average_minimum_groups.count().to_numpy())
 
-        # Kick out all tracks with less than 70 % motility
+        # Kick out all tracks with less than 70 % motility  @todo: make conditional
         angle_radians_minimum = np.where(
             min_average > 0.7,
             df['minimum'],
             0
-        )
+        ).astype(dtype=bool)
         if angle_radians_minimum.sum():  # If there are any data points (0 == False):
-            all_angles_radians = angle_radians[np.array(angle_radians_minimum, dtype=bool)]
-            # all_angles_radians = all_angles_radians[]
+            all_angles_radians = angle_radians[np.array(angle_radians_minimum)]  # , dtype=bool
             # print(stats.describe(all_angles_radians, nan_policy='omit'))
             bins_number = settings['save angle distribution plot / bins']
             bins = np.linspace(-np.pi, np.pi, bins_number + 1)
@@ -1032,21 +906,72 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             ax.set_theta_zero_location("N")  # theta=0 at the top
             ax.set_theta_direction(-1)  # theta increasing clockwise
             width = 2 * np.pi / bins_number
-            bars = ax.bar(bins[:bins_number], hist_array, width=width, bottom=0.0)
+            bars = ax.bar(
+                bins[:bins_number],
+                hist_array,
+                # height=,
+                width=width,
+                bottom=0.0,
+                # align='center',  # 'edge',  # x axis: 'edge': Align the left edges of the bars with the x positions.
+                # color='blue',
+                edgecolor='k',
+                # linewidth=,
+                # tick_label=,
+                # eclolr=,  # error bar color
+                # capsize=,  # error bar cap length
+                # error_kw=,  # dict of kwargs for error bar
+                # log=False,  # logarithmic y-axis
+            )
             for bar in bars:
                 bar.set_alpha(0.5)
             plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
-            plt.savefig(plot_save_path.format('angle_histogram'), dpi=300)
-            logger.info('Saving figure {}'.format(plot_save_path.format('angle_histogram')))
+            plot_save_path_angle_histogram = save_path.format('angle_histogram', '.png')
+            plt.savefig(plot_save_path_angle_histogram, dpi=300)
+            logger.info('Saving figure {}'.format(plot_save_path_angle_histogram))
             plt.close()
         else:
             logger.warning('Cannot create angle distribution plot as there are no motile tracks.')
 
     min_angle = settings['minimal angle in degrees for turning point']
-    df['angle_calc'] = np.degrees(angle_radians)
-    df['angle_calc'] = abs(df.groupby('TRACK_ID')['angle_calc'].diff().fillna(0))
-    df['angle_calc'] = np.where(360 - df['angle_calc'] <= df['angle_calc'], 360 - df['angle_calc'], df['angle_calc'])
-    df['turn_points'] = np.where((df['angle_calc'] > min_angle) & (df['minimum'] == 1), 1, 0)
+    df['angle_diff'] = np.degrees(angle_radians)
+    df['angle_diff'] = abs(df.groupby('TRACK_ID')['angle_diff'].diff().fillna(0))
+    df['angle_diff'] = np.where(360 - df['angle_diff'] <= df['angle_diff'],
+                                360 - df['angle_diff'],
+                                df['angle_diff']
+                                ).astype(np.int32)
+    df['turn_points'] = np.where((df['angle_diff'] > min_angle) & (df['minimum'] == 1), 1, 0).astype(np.uint8)
+
+    if settings['store processed .csv file']:
+        df['WIDTH'] = df['WIDTH'] / px_to_micrometre
+        df['HEIGHT'] = df['HEIGHT'] / px_to_micrometre
+        selected_data_csv = save_path.format('selected_data', '.csv')
+        try:
+            try:
+                old_selected_data_csv_path, old_selected_data_csv_ext = os.path.split(selected_data_csv)
+                old_selected_data_csv = '{}{}.{}'.format(
+                    old_selected_data_csv_path, datetime.now().strftime('%y%m%d%H%M%S'), old_selected_data_csv_ext
+                )
+                os.rename(selected_data_csv, old_selected_data_csv)
+                logger.critical('Old tracking.ini renamed to {}'.format(old_selected_data_csv))
+            except (FileNotFoundError, FileExistsError):
+                pass
+            except Exception as ex:
+                template = 'An exception of type {0} occurred while saving ' \
+                           'previous file {2} after sorting. Arguments:\n{1!r}'
+                logger.exception(template.format(type(ex).__name__, ex.args, selected_data_csv))
+            finally:
+                pass
+            with open(selected_data_csv, 'w+', newline='\n') as csv:  # save again as csv
+                df.loc[:,
+                       ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT',
+                        'travelled_dist', 'angle_diff', 'turn_points',
+                        ]].to_csv(csv, index=False)
+            logger.info('Selected results saved to: {}'.format(selected_data_csv))
+        except Exception as ex:
+            template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args, selected_data_csv))
+        finally:
+            pass
 
     df['x_norm'] = (df['POSITION_X'].sub(df.groupby('TRACK_ID')['POSITION_X'].transform('first'))) / px_to_micrometre
     df['y_norm'] = (df['POSITION_Y'].sub(df.groupby('TRACK_ID')['POSITION_Y'].transform('first'))) / px_to_micrometre
@@ -1055,11 +980,11 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # Get largest displacement during track
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
 
-    time_series = df.groupby('TRACK_ID')['POSITION_T'].agg('last')
+    time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
     time_series = (time_series + 1) / fps  # off-by-one error
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
     motile_total_series = df.groupby('TRACK_ID')['minimum'].agg('sum')
-    motile_series = (motile_total_series / df.groupby('TRACK_ID')['POSITION_T'].agg('last'))
+    motile_series = (motile_total_series / df.groupby('TRACK_ID')['t_norm'].agg('last'))
     # time, curr_track_null_points_per_s, distance, speed, displacement
     speed_series = pd.Series(
         (np.where(motile_total_series != 0,
@@ -1090,6 +1015,34 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         keys=name_of_columns, axis=1
     )
     del turn_percent_series, dist_series, speed_series, time_series, pdist_series, motile_series
+
+    if settings['store generated statistical .csv file']:
+        df_stats_csv = save_path.format('statistics', '.csv')
+        try:
+            try:
+                old_df_stats_csv_path, old_df_stats_csv_ext = os.path.split(df_stats_csv)
+                old_selected_data_csv = '{}{}.{}'.format(
+                    old_df_stats_csv_path, datetime.now().strftime('%y%m%d%H%M%S'), old_df_stats_csv_ext
+                )
+                os.rename(df_stats_csv, old_selected_data_csv)
+                logger.critical('Old tracking.ini renamed to {}'.format(old_selected_data_csv))
+            except (FileNotFoundError, FileExistsError):
+                pass
+            except Exception as ex:
+                template = 'An exception of type {0} occurred while saving ' \
+                           'previous file {2} after sorting. Arguments:\n{1!r}'
+                logger.exception(template.format(type(ex).__name__, ex.args, df_stats_csv))
+            finally:
+                pass
+            with open(df_stats_csv, 'w+', newline='\n') as csv:  # save again as csv
+                df_stats.to_csv(csv, index=False)
+            logger.info('Selected results saved to: {}'.format(df_stats_csv))
+        except Exception as ex:
+            template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args, df_stats_csv))
+        finally:
+            pass
+
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
     # total count
     all_entries = df_stats.shape[0]
@@ -1192,7 +1145,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             lw=0,
         )
         grouped_df = df.loc[
-                     :, ['TRACK_ID', 'distance_colour', 'POSITION_X', 'POSITION_Y']
+                     :, ['TRACK_ID', 'distance_colour', 'POSITION_X', 'POSITION_Y', ]
                      ].sort_values(['distance_colour'], ascending=False).groupby(
             'TRACK_ID', sort=False)['POSITION_X', 'POSITION_Y', 'distance_colour']
         for name, group in grouped_df:
@@ -1210,9 +1163,10 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             )
         del grouped_df
         plt.title('{} Track count: {}'.format(plot_title_name, len(track_change)))
-        # plot_save_path = '{}{}_Bac_Run_Overview.png'.format(daily_directory, file_name)
-        plt.savefig(plot_save_path.format('_Bac_Run_Overview'), dpi=300)
-        logger.info('Saving figure {}'.format(plot_save_path.format('_Bac_Run_Overview')))
+        # save_path = '{}{}_Bac_Run_Overview.png'.format(daily_directory, file_name)
+        plot_save_path_bac_run_overview = save_path.format('_Bac_Run_Overview', '.png')
+        plt.savefig(plot_save_path_bac_run_overview, dpi=300)
+        logger.info('Saving figure {}'.format(plot_save_path_bac_run_overview))
         plt.close()
 
     f = plt.figure()
@@ -1406,10 +1360,9 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         #     all_plots[axis].set_xticklabels(['All', '0 - 25', '25 - 50', '50 - 75', '75 - 100'])
     # tight_layout() clashes with plt.subplots(w, h, constrained_layout=True), which workes better anyway.
     # plt.tight_layout()
-    if settings['verbose']:
-        logger.debug('Saving figure {}'.format('{}{}_Bac_Run_Statistics.png'.format(daily_directory, file_name)))
-    plt.savefig('{}{}_Bac_Run_Statistics.png'.format(daily_directory, file_name), dpi=300)
-    logger.info('Statistics picture: {}{}_Bac_Run_Statistics.png'.format(daily_directory, file_name))
+    bac_run_statistics_path = save_path.format('_Bac_Run_Statistics', '.png')
+    plt.savefig(bac_run_statistics_path, dpi=300)
+    logger.info('Statistics picture: {}'.format(bac_run_statistics_path))
     plt.close()
     # slices = np.r_[slice(list_of_selected_plots[0][0], list_of_selected_plots[0][1] + 1),
     #                slice(list_of_selected_plots[1][0], list_of_selected_plots[1][1] + 1),

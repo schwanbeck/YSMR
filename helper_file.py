@@ -160,6 +160,7 @@ def create_configs():
         'maximal recursion depth': 960,
         'limit track length exactly': False,
         'compare angle between n frames': 10,
+        # @todo SPYS = [e.strip() for e in parser.get('global', 'spys').split(',')],
         'force tracking.ini fps settings': False,  # NEW
     }
 
