@@ -28,6 +28,8 @@ import numpy as np  # needed by cv2; otherwise crashes/freezes without comment
 from helper_file import (
     _backup,
     check_logfile,
+    collate_results_csv_to_xlsx,
+    create_results_folder,
     elapsed_time,
     find_paths,
     get_base_path,
@@ -113,7 +115,10 @@ if __name__ == '__main__':
     logger.debug('List save length set to {} entries'.format(settings['list save length interval']))
     logger.debug('Pixel/micrometre: {}'.format(settings['pixel per micrometre']))
 
+    # if settings['result folder'] != 'None':
+
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
+        result_folder = create_results_folder(path=settings['path to test video'])
         track_bacteria(settings['path to test video'], settings=settings)
 
     else:
@@ -204,6 +209,8 @@ if __name__ == '__main__':
                 logger.critical('{}'.format(path))
         else:
             logger.info('Finished with all files.')
+        if settings['collate results csv to xlsx']:
+            collate_results_csv_to_xlsx()
     # @todo: remove _backup later
     _backup()
 

@@ -28,7 +28,7 @@ from itertools import cycle as cycle
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from tkinter import filedialog, Tk
-from time import sleep
+from time import sleep, strftime, localtime
 
 import cv2
 import matplotlib.pyplot as plt
@@ -71,6 +71,44 @@ def bytes_to_human_readable(number_of_bytes):
             break  # stop if division would go below 1 or end of list is reached
         number_of_bytes /= bytes_in_a_kb  # divide otherwise
     return '{0:.01f} {1}'.format(number_of_bytes, unit)
+
+
+def collate_results_csv_to_xlsx(path=None, save_path=None):
+    logger = logging.getLogger('ei').getChild(__name__)
+    try:
+        import xlsxwriter
+    except ImportError as error:
+        logger.exception(error)
+        logger.warning('Could not import module \'xlsxwriter\', saving as .xlsx file is not possible.')
+        return
+    if save_path is None:
+        save_path = './'
+    if path is None:
+        path = get_base_path(rename=False)
+    file_path = '{}{}_collated_statistics.xlsx'.format(save_path, datetime.now().strftime('%y%m%d%H%M%S'))
+    paths = find_paths(base_path=path, extension='statistics.csv')
+    if paths:
+        writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
+        for path in paths:
+            with open(path, 'r', newline='\n') as csv:
+                df = pd.read_csv(csv,
+                                 # chunksize=10 ** 6,
+                                 sep=',',
+                                 header=0,
+                                 # usecols=[],
+                                 # dtype=[],
+                                 # names=[],
+                                 encoding='utf-8',
+                                 )
+            file_name = os.path.basename(path)
+            file_name = os.path.splitext(file_name)[0]
+            # Limit max rows and sheet name length
+            df.loc[:2**20 - 1, :].to_excel(writer, sheet_name=file_name[:31])
+        writer.save()
+        logger.info('Collated results: {}'.format(os.path.abspath(file_path)))
+    else:
+        logger.info('Could not find paths.')
+    return
 
 
 def create_configs():
@@ -122,6 +160,7 @@ def create_configs():
         'save turning point violin plot': True,  # NEW
         'save speed violin plot': True,  # NEW
         'save angle distribution plot / bins': 36,  # NEW
+        'collate results csv to xlsx': True,
         # @todo: group split selector / group split unit for violin plots
     }
 
@@ -289,6 +328,32 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
         except (FileNotFoundError, FileExistsError):
             pass
     return path
+
+
+def create_results_folder(path):
+    logger = logging.getLogger('ei').getChild(__name__)
+    folder_time = str(strftime('%y%m%d', localtime()))
+    dir_form = '{}/{}_Results/'  # @todo: specify results folder
+    if isinstance(path, str) or isinstance(path, os.PathLike):
+        daily_directory = dir_form.format(os.path.dirname(path), folder_time)
+    elif isinstance(path, list) or isinstance(path, tuple):
+        daily_directory = dir_form.format(os.path.dirname(path[0]), folder_time)
+    else:
+        daily_directory = dir_form.format('.', folder_time)
+        logger.critical('Could not access base path in path to files; '
+                        'results folder set to {}'.format(os.path.abspath(daily_directory)))
+    if not os.path.exists(daily_directory):
+        try:
+            _mkdir(daily_directory)
+            logger.info('Results folder: {}'.format(daily_directory))
+        except OSError as makedir_error:
+            logger.exception(makedir_error)
+            logger.warning('Unable to create {}, Directory changed to {}'.format(
+                daily_directory, os.path.abspath('./')))
+            daily_directory = './'
+        finally:
+            pass
+    return daily_directory
 
 
 def creation_date(path_to_file):
@@ -502,6 +567,7 @@ def get_configs(tracking_ini_filepath=None):
             'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
             'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
             'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
+            'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
             # @todo:  .get(# @todo)split selector / group split unit for violin plots
 
             # _config['LOGGING SETTINGS']

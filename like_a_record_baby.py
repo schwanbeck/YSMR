@@ -34,7 +34,8 @@ from scipy.spatial import distance as dist
 
 from helper_file import (
     _backup,
-    _mkdir,
+    # _mkdir,
+    create_results_folder,
     different_tracks,
     elapsed_time,
     find_paths,
@@ -507,7 +508,7 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
     return return_result, kick_reason
 
 
-def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
+def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
                   frame_height=None, frame_width=None, settings=None):
     logger = logging.getLogger('ei').getChild(__name__)
     '''
@@ -541,13 +542,13 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         logger.debug('Have accepted string {}'.format(path_to_file))
     if path_to_file is None:
         path_to_file = settings['path to test .csv']
-    if daily_directory is None:
+    if results_directory is None:
         folder_time = str(strftime('%y%m%d', localtime()))
-        daily_directory = '{}/{}_Result_py/'.format(os.path.dirname(path_to_file), folder_time)
-        if not os.path.exists(daily_directory):
+        results_directory = '{}/{}_Result_py/'.format(os.path.dirname(path_to_file), folder_time)
+        if not os.path.exists(results_directory):
             try:
-                os.makedirs(daily_directory)
-                logger.info('Creating daily folder {}'.format(daily_directory))
+                os.makedirs(results_directory)
+                logger.info('Creating daily folder {}'.format(results_directory))
             except OSError as makedir_error:
                 logger.exception(makedir_error)
     file_name = os.path.basename(path_to_file)
@@ -803,9 +804,9 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # Reset df to important bits
     if settings['verbose']:
         logger.debug('Resetting df')
-    df_passed_columns = ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', ]
-    if settings['store processed .csv file']:  # otherwise no longer needed
-        df_passed_columns.extend(['WIDTH', 'HEIGHT', ])
+    df_passed_columns = ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT', ]
+    # if settings['store processed .csv file']:  # otherwise no longer needed
+    #     df_passed_columns.extend(['WIDTH', 'HEIGHT', ])
     df = df.loc[df['good_track'] == 1, df_passed_columns]
     df.reset_index(inplace=True)
     diff_tracks_start, track_change = different_tracks(df)
@@ -832,7 +833,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         plot_title_name = '{}{}\n{}'.format(plot_title_name_a, plot_title_name_c, plot_title_name_d)
 
     # Format general save path
-    save_path = '{}{}'.format(daily_directory, file_name)
+    save_path = '{}{}'.format(results_directory, file_name)
     save_path = save_path + '_{}{}'
 
     # set up some overall values
@@ -858,6 +859,10 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     if any(df['t_norm'] < 0):  # validate
         logger.critical('POSITION_T contains negative values')
         return None
+
+    df['WIDTH'] = df['WIDTH'] / px_to_micrometre
+    df['HEIGHT'] = df['HEIGHT'] / px_to_micrometre
+    df['area'] = df['WIDTH'] * df['HEIGHT']
 
     if settings['verbose']:
         logger.debug('Starting with statistical calculations per track')
@@ -942,8 +947,6 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     df['turn_points'] = np.where((df['angle_diff'] > min_angle) & (df['minimum'] == 1), 1, 0).astype(np.uint8)
 
     if settings['store processed .csv file']:
-        df['WIDTH'] = df['WIDTH'] / px_to_micrometre
-        df['HEIGHT'] = df['HEIGHT'] / px_to_micrometre
         selected_data_csv = save_path.format('selected_data', '.csv')
         try:
             try:
@@ -965,7 +968,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
                 df.loc[:,
                        ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT',
                         'travelled_dist', 'angle_diff', 'turn_points',
-                        ]].to_csv(csv, index=False)
+                        ]].to_csv(csv, index=False, encoding='utf-8')
             logger.info('Selected results saved to: {}'.format(selected_data_csv))
         except Exception as ex:
             template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
@@ -979,7 +982,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     # Source: ALollz, stackoverflow.com/questions/51064346/
     # Get largest displacement during track
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
-
+    size_series = df.groupby('TRACK_ID')['area'].mean()
     time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
     time_series = (time_series + 1) / fps  # off-by-one error
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
@@ -996,12 +999,16 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
         (np.where(motile_total_series != 0,
                   turn_percent_series / motile_total_series,
                   0)), index=time_series.index)
+    # \u00B5: micro
+    # \u0025: percent
+    # \u0302: circumflex
     name_of_columns = ['Turn Points (TP/s)',  # 0
                        'Distance (\u00B5m)',  # 1
                        'Speed (\u00B5m/s)',  # 2
                        'Time (s)',  # 3
                        'Displacement',  # 4
-                       '% motile',  # 5
+                       '\u0025 motile',  # 5
+                       'Area (\u00B5m\u03022)',  # 6
                        ]
     # Create df for statistics
     df_stats = pd.concat(
@@ -1011,6 +1018,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
          time_series,  # 3
          pdist_series,  # 4
          motile_series,  # 5
+         size_series,  # 6
          ],
         keys=name_of_columns, axis=1
     )
@@ -1035,7 +1043,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             finally:
                 pass
             with open(df_stats_csv, 'w+', newline='\n') as csv:  # save again as csv
-                df_stats.to_csv(csv, index=False)
+                df_stats.to_csv(csv, index=False, encoding='utf-8')
             logger.info('Selected results saved to: {}'.format(df_stats_csv))
         except Exception as ex:
             template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
@@ -1163,7 +1171,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
             )
         del grouped_df
         plt.title('{} Track count: {}'.format(plot_title_name, len(track_change)))
-        # save_path = '{}{}_Bac_Run_Overview.png'.format(daily_directory, file_name)
+        # save_path = '{}{}_Bac_Run_Overview.png'.format(results_directory, file_name)
         plot_save_path_bac_run_overview = save_path.format('_Bac_Run_Overview', '.png')
         plt.savefig(plot_save_path_bac_run_overview, dpi=300)
         logger.info('Saving figure {}'.format(plot_save_path_bac_run_overview))
@@ -1370,7 +1378,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     #                slice(list_of_selected_plots[3][0], list_of_selected_plots[3][1] + 1),
     #                slice(list_of_selected_plots[4][0], list_of_selected_plots[4][1] + 1),
     #                slice(list_of_selected_plots[5][0], list_of_selected_plots[5][1] + 1)]
-    # with open('{}{}_df.csv'.format(daily_directory, file_name), 'w+', newline='\n') as csv_file:
+    # with open('{}{}_df.csv'.format(results_directory, file_name), 'w+', newline='\n') as csv_file:
     #     df.iloc[slices, :].to_csv(csv_file)
     # if False:
     #     df_single_plots = df.iloc[slices, :].copy()
@@ -1380,7 +1388,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     #         px_to_micrometre=px_to_micrometre,
     #         # period=period,
     #         # avg_mask=avg_mask,
-    #         plot_name='{}{}_single_tracks.png'.format(daily_directory, file_name),
+    #         plot_name='{}{}_single_tracks.png'.format(results_directory, file_name),
     #         fps=fps)
     # else:
     #     logger.info('No single tracks selected.')
@@ -1389,7 +1397,7 @@ def select_tracks(path_to_file=None, daily_directory=None, df=None, fps=None,
     return end_string
 
 
-def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None, daily_directory=None,
+def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None, results_directory=None,
                 settings=None, create_logger=True, ):
     logger = logging.getLogger('ei').getChild(__name__)
     '''
@@ -1411,35 +1419,15 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
                     short_file_output=settings['shorten logfile logging output'],
                     log_to_file=settings['log to file'],)
     end_string = None
-    folder_time = str(strftime('%y%m%d', localtime()))
-    dir_form = '{}/{}_Results/'  # @todo: specify results folder
-    if daily_directory is None:
-        if isinstance(path_to_files, str) or isinstance(path_to_files, os.PathLike):
-            daily_directory = dir_form.format(os.path.dirname(path_to_files), folder_time)
-        elif isinstance(path_to_files, list) or isinstance(path_to_files, tuple):
-            daily_directory = dir_form.format(os.path.dirname(path_to_files[0]), folder_time)
-        else:
-            daily_directory = dir_form.format('.', folder_time)
-            logger.critical('Could not access base path in path to files; '
-                            'results folder set to {}'.format(os.path.abspath(daily_directory)))
-        if not os.path.exists(daily_directory):
-            try:
-                _mkdir(daily_directory)
-                logger.info('Results folder: {}'.format(daily_directory))
-            except OSError as makedir_error:
-                logger.exception(makedir_error)
-                logger.warning('Unable to create {}, Directory changed to {}'.format(
-                    daily_directory, os.path.abspath('./')))
-                daily_directory = './'
-            finally:
-                pass
+    if results_directory is None:
+        results_directory = create_results_folder(path=path_to_files)
     # Check type of path_to_files
     if isinstance(path_to_files, str) or isinstance(path_to_files, os.PathLike):
         # Skip list read via get_data() if we have a data frame:
         if type(df) is pd.core.frame.DataFrame:
             logger.debug('Passing data frame to select_tracks(): {}'.format(path_to_files))
             end_string = select_tracks(path_to_file=path_to_files,
-                                       daily_directory=daily_directory,
+                                       results_directory=results_directory,
                                        df=df,
                                        fps=fps,
                                        frame_height=frame_height,
@@ -1449,7 +1437,7 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
         elif os.path.isfile(path_to_files):
             logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
             end_string = select_tracks(path_to_file=path_to_files,
-                                       daily_directory=daily_directory,
+                                       results_directory=results_directory,
                                        fps=fps,
                                        frame_height=frame_height,
                                        frame_width=frame_width,
@@ -1464,7 +1452,7 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
             if os.path.isfile(curr_path_to_file):
                 logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
                 end_string.append(select_tracks(path_to_file=path_to_files,
-                                                daily_directory=daily_directory,
+                                                results_directory=results_directory,
                                                 fps=fps,
                                                 frame_height=frame_height,
                                                 frame_width=frame_width,

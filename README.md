@@ -14,6 +14,9 @@ Python 3.5 or higher
 + Scipy
 + Seaborn
 
+Optional:
++ XlsxWriter
+
 ## Usage
 
 ## Explanation of tracking.ini file
@@ -115,6 +118,13 @@ Explanation of each setting in the tracking.ini file and the initial default set
 	+ Accepts 'True' or 'False'.
 + save speed violin plot : True
 	+ When set to True a violin plot of the tracks average speed will be generated.
+	+ Accepts 'True' or 'False'.
++ save angle distribution plot / bins: 36
+	+ Setting the value to 0 will disable the angle distribution plot.
+	+ ### Angle distribution plot description here
+	+ Accepts 'True' or 'False'.
++ collate results csv to xlsx: True
+	+ ### distribution here
 	+ Accepts 'True' or 'False'.
 
 ##### LOGGING SETTINGS
