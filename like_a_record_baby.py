@@ -50,7 +50,7 @@ from helper_file import (
 from tracker import CentroidTracker
 
 
-def track_bacteria(curr_path, settings=None):
+def track_bacteria(curr_path, settings=None, result_folder=None):
     logger = logging.getLogger('ei').getChild(__name__)
     '''
     Used settings:
@@ -114,6 +114,8 @@ def track_bacteria(curr_path, settings=None):
             fps_of_file = settings['frames per second']
     finally:
         pass
+    if settings['save video'] and not result_folder:
+        result_folder = create_results_folder(curr_path)
 
     pathname, filename_ext = os.path.split(curr_path)
     filename = os.path.splitext(filename_ext)[0]
@@ -148,7 +150,7 @@ def track_bacteria(curr_path, settings=None):
     # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
     if settings['save video']:
-        output_video_name = '{}/{}_output.avi'.format(pathname, filename)
+        output_video_name = '{}/{}_output.avi'.format(result_folder, filename)
         logger.info('Output video file: {}'.format(output_video_name))
         out = cv2.VideoWriter(output_video_name,
                               cv2.VideoWriter_fourcc(*'MJPG'),  # Codec *'MJPG'  # X264
@@ -387,6 +389,7 @@ def track_bacteria(curr_path, settings=None):
                         frame_width=frame_width,
                         settings=settings,
                         create_logger=False,
+                        results_directory=result_folder,
                         )
         if settings['delete .csv file after analysis']:
             logger.info('Removing .csv file: {}'.format(list_name))
@@ -543,14 +546,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     if path_to_file is None:
         path_to_file = settings['path to test .csv']
     if results_directory is None:
-        folder_time = str(strftime('%y%m%d', localtime()))
-        results_directory = '{}/{}_Result_py/'.format(os.path.dirname(path_to_file), folder_time)
-        if not os.path.exists(results_directory):
-            try:
-                os.makedirs(results_directory)
-                logger.info('Creating daily folder {}'.format(results_directory))
-            except OSError as makedir_error:
-                logger.exception(makedir_error)
+        results_directory = create_results_folder(path_to_file)
     file_name = os.path.basename(path_to_file)
     file_name = os.path.splitext(file_name)[0]
     # file_name = datetime.now().strftime('%y%m%d%H%M%S') + '_{}'.format(file_name)
@@ -602,7 +598,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     _, track_change = different_tracks(df)  # different_tracks returns [starts], [stops]
     initial_length, initial_size = (len(track_change), df.shape[0])
 
-    df['area'] = df['WIDTH'] * df['HEIGHT']  # calculate area of bacteria
+    df['area'] = df['WIDTH'] * df['HEIGHT']  # calculate area of bacteria in px**2
     # In general, area is set to np.NaN if anything is wrong, so we later only have
     # to search for np.NaNs in one column in order to know which rows to remove
     if settings['verbose']:
@@ -678,9 +674,10 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     # actually bacteria
     if settings['percent quantiles excluded area'] > 0:
         q1_area, q3_area = df['area'].quantile(q=[
-            settings['percent quantiles excluded area'], (1 - settings['percent quantiles excluded area'])
+            settings['percent quantiles excluded area'],
+            (1 - settings['percent quantiles excluded area'])
         ])
-        logger.info('Area 10 % quartiles: {:.2f}, {:.2f}'.format(
+        logger.info('Area quartiles: 10%: {:.2f}, 90%: {:.2f}'.format(
             q1_area, q3_area, ))
     else:  # get everything
         q1_area = -1
@@ -862,7 +859,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
 
     df['WIDTH'] = df['WIDTH'] / px_to_micrometre
     df['HEIGHT'] = df['HEIGHT'] / px_to_micrometre
-    df['area'] = df['WIDTH'] * df['HEIGHT']
+    df['area'] = df['WIDTH'] * df['HEIGHT']  # calculate area of bacteria in micrometre**2
 
     if settings['verbose']:
         logger.debug('Starting with statistical calculations per track')
@@ -999,16 +996,14 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
         (np.where(motile_total_series != 0,
                   turn_percent_series / motile_total_series,
                   0)), index=time_series.index)
-    # \u00B5: micro
-    # \u0025: percent
-    # \u0302: circumflex
+
     name_of_columns = ['Turn Points (TP/s)',  # 0
-                       'Distance (\u00B5m)',  # 1
-                       'Speed (\u00B5m/s)',  # 2
+                       'Distance (µm)',  # 1
+                       'Speed (µm/s)',  # 2
                        'Time (s)',  # 3
                        'Displacement',  # 4
-                       '\u0025 motile',  # 5
-                       'Area (\u00B5m\u03022)',  # 6
+                       '% motile',  # 5
+                       'Area (µm^2)',  # 6
                        ]
     # Create df for statistics
     df_stats = pd.concat(
@@ -1397,8 +1392,9 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     return end_string
 
 
-def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None, results_directory=None,
-                settings=None, create_logger=True, ):
+# @todo: roll into select_tracks
+def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None,
+                results_directory=None, settings=None, create_logger=True, ):
     logger = logging.getLogger('ei').getChild(__name__)
     '''
     settings['log_level']
