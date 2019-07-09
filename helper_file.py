@@ -335,25 +335,25 @@ def create_results_folder(path):
     folder_time = str(strftime('%y%m%d', localtime()))
     dir_form = '{}/{}_Results/'  # @todo: specify results folder
     if isinstance(path, str) or isinstance(path, os.PathLike):
-        daily_directory = dir_form.format(os.path.dirname(path), folder_time)
+        directory = dir_form.format(os.path.dirname(path), folder_time)
     elif isinstance(path, list) or isinstance(path, tuple):
-        daily_directory = dir_form.format(os.path.dirname(path[0]), folder_time)
+        directory = dir_form.format(os.path.dirname(path[0]), folder_time)
     else:
-        daily_directory = dir_form.format('.', folder_time)
+        directory = dir_form.format('.', folder_time)
         logger.critical('Could not access base path in path to files; '
-                        'results folder set to {}'.format(os.path.abspath(daily_directory)))
-    if not os.path.exists(daily_directory):
+                        'results folder set to {}'.format(os.path.abspath(directory)))
+    if not os.path.exists(directory):
         try:
-            _mkdir(daily_directory)
-            logger.info('Results folder: {}'.format(daily_directory))
+            _mkdir(directory)
+            logger.info('Results folder: {}'.format(directory))
         except OSError as makedir_error:
             logger.exception(makedir_error)
             logger.warning('Unable to create {}, Directory changed to {}'.format(
-                daily_directory, os.path.abspath('./')))
-            daily_directory = './'
+                directory, os.path.abspath('./')))
+            directory = './'
         finally:
             pass
-    return daily_directory
+    return directory
 
 
 def creation_date(path_to_file):
