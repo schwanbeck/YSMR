@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
         result_folder = create_results_folder(path=settings['path to test video'])
-        track_bacteria(settings['path to test video'], settings=settings)
+        track_bacteria(settings['path to test video'], settings=settings, result_folder=result_folder)
 
     else:
         pool = mp.Pool()  # get a pool of worker processes per available core
@@ -154,7 +154,7 @@ if __name__ == '__main__':
                                         maximal_age=settings['maximal video file age (infinite or seconds)'], ))
             # Remove generated output files
             paths = [path for path in paths if '_output.' not in path]
-            if len(paths) <= 0:  # Might as well stop
+            if not paths:  # Might as well stop, [] == False
                 logger.warning('No acceptable files found in {}\n'.format(folder_path))
                 queue_listener.stop()
                 sys.exit('No files found in {}'.format(folder_path))
@@ -181,9 +181,10 @@ if __name__ == '__main__':
                     logger.debug('User has given it\'s blessing.')
                     break
         results = {}
+        result_folder = create_results_folder(paths[0])
         for path in paths:
             # Asynchronous calls to track_bacteria() with each path
-            results[path] = pool.apply_async(track_bacteria, args=(path, settings,))
+            results[path] = pool.apply_async(track_bacteria, args=(path, settings, result_folder))
         pool.close()
         pool.join()
 
@@ -210,7 +211,7 @@ if __name__ == '__main__':
         else:
             logger.info('Finished with all files.')
         if settings['collate results csv to xlsx']:
-            collate_results_csv_to_xlsx()
+            collate_results_csv_to_xlsx(path=folder_path, save_path=result_folder)
     # @todo: remove _backup later
     _backup()
 
