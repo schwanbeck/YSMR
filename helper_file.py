@@ -14,7 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 details. You should have received a copy of the GNU General Public License along with YSMR. If
 not, see <http://www.gnu.org/licenses/>.
 """
-
+import collections
 import configparser
 import logging
 import os
@@ -73,7 +73,7 @@ def bytes_to_human_readable(number_of_bytes):
     return '{0:.01f} {1}'.format(number_of_bytes, unit)
 
 
-def collate_results_csv_to_xlsx(path=None, save_path=None):
+def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statistics.csv'):
     logger = logging.getLogger('ei').getChild(__name__)
     try:
         import xlsxwriter
@@ -86,7 +86,7 @@ def collate_results_csv_to_xlsx(path=None, save_path=None):
     if path is None:
         path = get_base_path(rename=False)
     file_path = '{}{}_collated_statistics.xlsx'.format(save_path, datetime.now().strftime('%y%m%d%H%M%S'))
-    paths = find_paths(base_path=path, extension='statistics.csv')
+    paths = find_paths(base_path=path, extension=csv_extension)
     if paths:
         writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
         for path in paths:
@@ -388,12 +388,12 @@ def different_tracks(data, column='TRACK_ID'):
     track_id = data[column].array
     # get np.ndarray with the values where track changes occur
     # by comparing every element with the previous one
-    changes = np.where(track_id[:-1] != track_id[1:])[0]
-    changes = changes.tolist()  # convert to list for manipulation
+    stops = np.where(track_id[:-1] != track_id[1:])[0]
+    stops = stops.tolist()  # convert to list for manipulation
     starts = [0]  # Initialise starts; track 0 starts at index 0 obviously
-    starts.extend([item + 1 for item in changes])  # others start at stop + 1
-    changes.append(data.index.max())  # Append last stop to list of stops
-    return starts, changes
+    starts.extend([item + 1 for item in stops])  # others start at stop + 1
+    stops.append(data.index.max())  # Append last stop to list of stops
+    return starts, stops
 
 
 def elapsed_time(time_one):
@@ -407,15 +407,17 @@ def elapsed_time(time_one):
     return time_delta
 
 
-def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, recursive=True):
+def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, recursive=True, settings=None):
+    # @todo: extension -> list; for-loop for ext.
     logger = logging.getLogger('ei').getChild(__name__)
     if not os.path.exists(base_path):
         logger.critical('Path could not be found: {}'.format(base_path))
         return None
     if extension is None:
-        extension = _config['VIDEO_SETTINGS'].get('extension', fallback='.mp4')
+        extension = settings['VIDEO_SETTINGS'].get('extension', fallback='.mp4')
     if base_path[-1] != '/':
         base_path = '{}/'.format(base_path)
+
     base_path = '{}**/*{}'.format(base_path, extension)
     in_files = glob(base_path, recursive=recursive)
     out_files = []
@@ -476,6 +478,8 @@ def get_colour_map(counts, colour_map=plt.cm.gist_rainbow):
 
 def get_configs(tracking_ini_filepath=None):
     logger = logging.getLogger('ei').getChild(__name__)
+    if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
+        return tracking_ini_filepath
     if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
         _config.read(tracking_ini_filepath)
     settings_dict = None
@@ -705,7 +709,6 @@ def get_data(csv_file_path, dtype=None):
     logger = logging.getLogger('ei').getChild(__name__)
     if type(csv_file_path) is not (str or os.PathLike or bytes) and (list or tuple):
         csv_file_path = csv_file_path[0]
-        # hasattr(csv_file_path, '__')
         logger.warning('Passed list or tuple argument to get_data(); get_data() only used first argument.')
     try:
         file_size = os.path.getsize(csv_file_path)
@@ -815,6 +818,7 @@ def save_list(file_path, filename, coords=None, first_call=False, rename_old_lis
         return old_list, file_csv
 
     if coords:  # Check if we actually received something
+        # @todo: sort coords here to speed up sorting process later?
         string_holder = ''  # Create empty string to which rows are appended
         for item in coords:
             # convert tuple first into single parts, then to .csv row
