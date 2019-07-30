@@ -78,12 +78,13 @@ class CentroidTracker:
         else:
             # initialize an array of input centroids for the current frame
             # rects should look like [((x, y, ...), (additional_info)), ((x, y, ...), (additional_info)), ...]
-            input_centroids = np.zeros((len(rects), len(rects[0][0])), dtype="float")  # length x dimension(s)
+            input_centroids = np.zeros((len(rects), len(rects[0][0])), dtype='float')  # length x dimension(s)
             # Here length is amount of data points, dimensions is
             # width of tuples passed by rects (x, y, [, illumination])
 
             # Initialise additional_info_dict to store additional information per centroid
             additional_info_dict = {}
+
             # Original version:
             # loop over the bounding box rectangles
             # for (i, (startX, startY, endX, endY)) in enumerate(rects):  # Original
@@ -123,12 +124,12 @@ class CentroidTracker:
                 # smallest value in each row and then (2) sort the row
                 # indexes based on their minimum values so that the row
                 # with the smallest value is at the *front* of the index
-                # list_i
+                # list
                 rows = distance_matrix.min(axis=1).argsort()
 
                 # next, we perform a similar process on the columns by
                 # finding the smallest value in each column and then
-                # sorting using the previously computed row index list_i
+                # sorting using the previously computed row index list
                 cols = distance_matrix.argmin(axis=1)[rows]
                 # in order to determine if we need to update, register,
                 # or deregister an object we need to keep track of which
@@ -144,6 +145,7 @@ class CentroidTracker:
                         # continue jumps back to the beginning of the for-loop
                         continue
                     # @todo: distance check? Currently kicked out in find_good_tracks()/like_a_record_baby.py
+                    # @todo: could be done by setting distance_matrix values > max. travel dist. to NaN?
                     # otherwise, grab the object ID for the current row,
                     # set its new centroid, and reset the disappeared counter
                     object_id = object_ids[row]
