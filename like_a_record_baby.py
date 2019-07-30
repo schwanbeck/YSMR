@@ -71,10 +71,9 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     # settings['evaluate files after analysis']
     '''
     t_one_track_bacteria = datetime.now()
+    settings = get_configs(settings)  # Get settings
     if settings is None:
-        settings = get_configs()
-    if settings is None:
-        logger.critical('No settings provided / could not get settings for track_bacteria().')
+        logger.critical('No settings provided / could not get settings for start_it_up().')
         return None
     # We may have to set the log level/loggers again due to multiprocessing
     get_loggers(
@@ -130,12 +129,9 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     curr_frame_count = 0
     threshold_list = []
     # skip_frames = 0
-    # total_threshold = 0  # Detection threshold total at which gray value bacteria are detected;
-    # calculated differently depending on white_bac_on_black_bgr
     fps_total = []  # List of calculated fps
-    # curr_threshold = 0  # Current threshold (calculated on the first 600 frames; thereafter left as is)
     error_during_read = False  # Set to true if some errors occur; used to restore old list afterwards if it exists
-    (objects, degrees) = (None, None)  # reset objects, additional_info (probably useless but doesn't hurt)
+    (objects, degrees) = (None, None)  # reset objects, additional_info (caused errors in the past)
 
     if settings['debugging'] and settings['display video analysis']:
         # Display first frame in case frame-by-frame analysis is necessary
@@ -192,8 +188,6 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
 
         gray = cv2.cvtColor(frame, settings['color filter'])  # Convert to gray scale
 
-        # if curr_frame_count <= settings['minimal frame count'] or curr_frame_count <= 20 * fps_of_file:
-        # the 'or <= 20 * fps' in case a low threshold was specified
         # set threshold adaptively
         mean, stddev = cv2.meanStdDev(gray)
         if settings['white bacteria on dark background']:
@@ -235,8 +229,8 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
             # All pixels above curr_threshold are set to 255 (white); others are set to 0
             thresh = cv2.threshold(blurred, curr_threshold, 255, cv2.THRESH_BINARY)[1]
         else:
-            thresh = cv2.threshold(blurred, curr_threshold, 255, cv2.THRESH_BINARY_INV)[1]
             # Simply inverse output (as above)
+            thresh = cv2.threshold(blurred, curr_threshold, 255, cv2.THRESH_BINARY_INV)[1]
 
         # Other threshold variations; proved unnecessary:
         # thresh = cv2.threshold(blurred, 90, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
@@ -459,18 +453,18 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
                     # off all detections if mostly bacteria are detected
                     if lower_boundary <= df['area'].mean() <= upper_boundary:
                         kick_reason -= 1
-                        # Rod-shaped bacteria should have a w/h ratio of 1:8 to roughly 1:1.5
-                        if settings['average width/height ratio min.'] < df['ratio_wh'].mean() < \
-                                settings['average width/height ratio max.']:
-                            # 0.125 < average_ratio < 0.67:
+                        # width/height ratio is bacterial shape specific
+                        if (settings['average width/height ratio min.']
+                                < df['ratio_wh'].mean()
+                                < settings['average width/height ratio max.']):
                             kick_reason -= 1
-                            # exclude 5% of screen edges
-                            if settings['percent of screen edges to exclude'] * frame_height \
-                                    < df['POSITION_Y'].mean() < (
-                                    1 - settings['percent of screen edges to exclude']) * frame_height:
-                                if settings['percent of screen edges to exclude'] * frame_width \
-                                        < df['POSITION_X'].mean() < (
-                                        1 - settings['percent of screen edges to exclude']) * frame_width:
+                            # exclude n% of screen edges
+                            if (settings['percent of screen edges to exclude'] * frame_height
+                                    < df['POSITION_Y'].mean()
+                                    < (1 - settings['percent of screen edges to exclude']) * frame_height):
+                                if (settings['percent of screen edges to exclude'] * frame_width
+                                        < df['POSITION_X'].mean()
+                                        < (1 - settings['percent of screen edges to exclude']) * frame_width):
                                     kick_reason -= 1
                                     # everything is as it should be, append start/stop to return_result
                                     return_result.append((start, stop))
@@ -482,8 +476,8 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
         # Halve track into part before/after hole; try to analyze those instead; extend return_result
         else:
             # Hole is index of largest number in df['POSITION_T'].diff()
-            hole_idx = look_for_holes.idxmax()
-            sub_part.extend([(start, hole_idx - 1), (hole_idx, stop)])
+            idx_hole = look_for_holes.idxmax()
+            sub_part.extend([(start, idx_hole - 1), (idx_hole, stop)])
     elif recursion >= settings['maximal recursion depth'] != 0:
         logger.debug('Recursion reached max. level at TRACK_ID: {} start: {} stop: {}'.format(
             df_passed.loc[start, 'TRACK_ID'], start, stop))
@@ -536,11 +530,10 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     settings['minimal angle in degrees for turning point']
     settings['save large plots']
     '''
+    settings = get_configs(settings)  # Get settings
     if settings is None:
-        settings = get_configs()  # Get settings
-        if settings is None:
-            logger.critical('No settings provided / could not get settings for start_it_up().')
-            return None
+        logger.critical('No settings provided / could not get settings for start_it_up().')
+        return None
     if settings['verbose']:
         logger.debug('Have accepted string {}'.format(path_to_file))
     if path_to_file is None:
@@ -619,25 +612,28 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
             np.NaN  # delete otherwise
         )
     # set zeroes in area to NaN
-    # tracker.py sets width/height as 0 if it can't connect tracks, thus every data point with area == 0 is suspect
+    # tracker.py sets width/height as 0 if it can't connect tracks,
+    # thus every data point with area == 0 is suspect
     df.loc[df['area'] == 0, 'area'] = np.NaN
 
     # remove too short frames
     df['length'] = (df.groupby('TRACK_ID')['POSITION_T'].transform('last') -
-                    df.groupby('TRACK_ID')['POSITION_T'].transform('first') + 1).astype(np.uint16)
+                    df.groupby('TRACK_ID')['POSITION_T'].transform('first') + 1
+                    ).astype(np.uint16)
     df['area'] = np.where(
         df['length'] >= settings['minimal length in seconds'],
         df['area'],  # track is fine
         np.NaN  # delete otherwise
     )
-    # df['no_move'] = np.sqrt(
+    # delete immotile tracks
+    # no_move = np.sqrt(
     #     (df.groupby('TRACK_ID')['POSITION_X'].transform('last') -
     #      df.groupby('TRACK_ID')['POSITION_X'].transform('first')) ** 2 +
     #     (df.groupby('TRACK_ID')['POSITION_Y'].transform('last') -
     #      df.groupby('TRACK_ID')['POSITION_Y'].transform('first')) ** 2
     # )
     # df['area'] = np.where(
-    #     df['no_move'] >= 10,
+    #     no_move >= 10,
     #     df['area'],  # track is fine
     #     np.NaN  # delete otherwise
     # )
@@ -646,7 +642,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     # As we'll later need only the remaining areas, we'll drop the NaNs
     if settings['verbose']:
         logger.debug('Dropping NaN values from df')
-    df.dropna(inplace=True, subset=['area'])  # df.query('Diff > 0.1')  # df[df.Diff > 0.1]
+    df.dropna(inplace=True, subset=['area'])
 
     # reset index to calculate track_change again
     if settings['verbose']:
@@ -686,6 +682,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
         df['distance'] = np.sqrt(np.square(df['POSITION_X'].diff()) +
                                  np.square(df['POSITION_Y'].diff())) / df['POSITION_T'].diff()
         np.put(df['distance'], track_start, 0)
+        # @todo: change to groupby
         q1_dist, q3_dist = df['distance'].quantile(q=[0.25, 0.75])  # IQR
         distance_outlier = (q3_dist - q1_dist) * 3 + q3_dist  # outer fence
         df['distance'] = np.where(df['distance'] > distance_outlier, 1, 0).astype(np.int8)
@@ -717,15 +714,16 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     # Go through all tracks, look for those that match all conditions, append to list
     # @to do: groupby find_good_tracks -> tried that; not possible due to recursive calls / stack overflow
     for start, stop in zip(track_start, track_change):
-        good_track_result, kick_reason = find_good_tracks(df_passed=df,
-                                                          lower_boundary=q1_area,
-                                                          upper_boundary=q3_area,
-                                                          start=start,
-                                                          stop=stop,
-                                                          settings=settings,
-                                                          frame_height=frame_height,
-                                                          frame_width=frame_width,
-                                                          )
+        good_track_result, kick_reason = find_good_tracks(
+            df_passed=df,
+            lower_boundary=q1_area,
+            upper_boundary=q3_area,
+            start=start,
+            stop=stop,
+            settings=settings,
+            frame_height=frame_height,
+            frame_width=frame_width,
+        )
         kick_reasons[kick_reason] += 1
         # if good_track_result is empty, skip rest:
         if not good_track_result:
@@ -789,6 +787,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
         end_string = 'File {} has no acceptable tracks.'.format(path_to_file)
         logger.warning(end_string)
         return None
+
     # Convert good_track to list for use with np.put
     # (a lot faster than setting slices of np.array to true for some reason)
     df['good_track'] = np.zeros(df.shape[0], dtype=np.int8)
@@ -798,7 +797,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     np.put(df['good_track'], set_good_track_to_true, 1)
     del set_good_track_to_true
 
-    # Reset df to important bits
+    # Reset df to important parts
     if settings['verbose']:
         logger.debug('Resetting df')
     df_passed_columns = ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT', ]
@@ -806,9 +805,19 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     #     df_passed_columns.extend(['WIDTH', 'HEIGHT', ])
     df = df.loc[df['good_track'] == 1, df_passed_columns]
     df.reset_index(inplace=True)
-    diff_tracks_start, track_change = different_tracks(df)
+    return evaluate_tracks(file_name=file_name, results_directory=results_directory,
+                           df=df, settings=settings, fps=fps)
 
-    # @todo: allow user customisation of plot title name
+
+def evaluate_tracks(file_name, results_directory, df=None, settings=None, fps=None, ):
+    logger = logging.getLogger('ei').getChild(__name__)
+    settings = get_configs(settings)  # Get settings
+    if settings is None:
+        logger.critical('No settings provided / could not get settings for start_it_up().')
+        return None
+    diff_tracks_start, track_change = different_tracks(df)
+    px_to_micrometre = settings['pixel per micrometre']
+    # @todo: allow user customisation of plot title name?
     # Set up plot title name
     plot_title_name = file_name.replace('_', ' ')
     plot_title_name = plot_title_name.split(sep='.', maxsplit=1)[0]
@@ -821,7 +830,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
         finally:
             pass
         plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
-
+    # @todo: sort plot_title_name out
     if len(plot_title_name) > 90:
         plot_title_name_len_half = int(0.5 * len(plot_title_name))
         plot_title_name_a = plot_title_name[:plot_title_name_len_half]
@@ -830,8 +839,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
         plot_title_name = '{}{}\n{}'.format(plot_title_name_a, plot_title_name_c, plot_title_name_d)
 
     # Format general save path
-    save_path = '{}{}'.format(results_directory, file_name)
-    save_path = save_path + '_{}{}'
+    save_path = '{}{}'.format(results_directory, file_name) + '_{}{}'
 
     # set up some overall values
     if settings['verbose']:
@@ -929,7 +937,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
             plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
             plot_save_path_angle_histogram = save_path.format('angle_histogram', '.png')
             plt.savefig(plot_save_path_angle_histogram, dpi=300)
-            logger.info('Saving figure {}'.format(plot_save_path_angle_histogram))
+            logger.debug('Saving figure {}'.format(plot_save_path_angle_histogram))
             plt.close()
         else:
             logger.warning('Cannot create angle distribution plot as there are no motile tracks.')
@@ -1169,7 +1177,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
         # save_path = '{}{}_Bac_Run_Overview.png'.format(results_directory, file_name)
         plot_save_path_bac_run_overview = save_path.format('_Bac_Run_Overview', '.png')
         plt.savefig(plot_save_path_bac_run_overview, dpi=300)
-        logger.info('Saving figure {}'.format(plot_save_path_bac_run_overview))
+        logger.debug('Saving figure {}'.format(plot_save_path_bac_run_overview))
         plt.close()
 
     f = plt.figure()
@@ -1203,7 +1211,7 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
             logger.debug('Plot {} / {}'.format(plot_idx + 1, len(all_plots)))  # in case plotting takes forever
         if plot_idx == 1:  # 0,0 centered plot of all tracks
             all_plots[plot_idx].set_title('{}\nTracks: {}, Prediction: {}'.format(
-                plot_title_name, len(good_track), prediction))
+                plot_title_name, len(diff_tracks_start), prediction))
 
             # get relevant columns, sort by distance (descending), then group sorted df by TRACK_ID
             grouped_df = df.loc[
@@ -1403,11 +1411,10 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
     settings['shorten logfile logging output']
     settings['log to file']
     '''
+    settings = get_configs(settings)  # Get settings
     if settings is None:
-        settings = get_configs()
-        if settings is None:
-            logger.critical('No settings provided / could not get settings for start_it_up().')
-            return None
+        logger.critical('No settings provided / could not get settings for start_it_up().')
+        return None
     if create_logger:
         get_loggers(log_level=settings['log_level'],
                     logfile_name=settings['log file path'],
@@ -1521,7 +1528,7 @@ if __name__ == '__main__':
             logger_main.info('Results folder: {}'.format(main_daily_directory))
         except OSError as mkdir_error:
             logger_main.exception(mkdir_error)
-            logger_main.warning('Unable to create {}, Directory changed to {}'.format(
+            logger_main.warning('Unable to create {}, directory changed to {}'.format(
                 main_daily_directory, os.path.abspath('./')))
             main_daily_directory = './'
         finally:
