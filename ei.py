@@ -118,7 +118,8 @@ if __name__ == '__main__':
     # if settings['result folder'] != 'None':
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
-        result_folder = create_results_folder(path=settings['path to test video'])
+        folder_path = os.path.dirname(settings['path to test video'])
+        result_folder = create_results_folder(path=folder_path)
         track_bacteria(settings['path to test video'], settings=settings, result_folder=result_folder)
 
     else:
@@ -161,6 +162,7 @@ if __name__ == '__main__':
             paths.sort()
         else:
             paths = [settings['path to test video']]
+            folder_path = os.path.dirname(settings['path to test video'])
             logger.info('Test video path selected')
             # @todo: get video file list per calling args/argparser
         for path in paths:
