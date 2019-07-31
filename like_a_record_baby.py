@@ -47,6 +47,7 @@ from helper_file import (
     save_list,
     sort_list,
     save_df_to_csv)
+from plot_functions import angle_distribution_plot, save_large_plot
 from tracker import CentroidTracker
 
 
@@ -125,7 +126,7 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
                                     first_call=True, rename_old_list=settings['rename previous result .csv'],
                                     illumination=settings['include luminosity in tracking calculation'])
     # Save old_list_name for later if it exists; False otherwise
-    ct = CentroidTracker()  # Initialise tracker instance
+    ct = CentroidTracker(max_disappeared=fps_of_file)  # Initialise tracker instance
     coords = []  # Empty list to store calculated coordinates
     curr_frame_count = 0
     threshold_list = []
@@ -537,6 +538,8 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
         return None
+    # if not any([]):  @todo: if not any() check for total analysis requirements
+    #     return 'No action required.'
     if settings['verbose']:
         logger.debug('Have accepted string {}'.format(path_to_file))
     if path_to_file is None:
@@ -906,63 +909,20 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         df['minimum'] = df.groupby('TRACK_ID')['minimum'].transform(medfilt, kernel_size=kernel_size)
     np.put(df['minimum'], diff_tracks_start, 0)
     angle_diff = settings['compare angle between n frames']
-
     x_diff_track_for_angle = df.groupby('TRACK_ID')['POSITION_X'].diff(angle_diff)  # .fillna(method='bfill')
     y_diff_track_for_angle = df.groupby('TRACK_ID')['POSITION_Y'].diff(angle_diff)  # .fillna(method='bfill')
-    angle_radians = np.arctan2(x_diff_track_for_angle, y_diff_track_for_angle)
+    df['angle_diff'] = np.arctan2(x_diff_track_for_angle, y_diff_track_for_angle)  # rad
 
     # Angle distribution histogram
     if settings['save angle distribution plot / bins']:
-        # Create array with average motility percentage per track
-        average_minimum_groups = df.groupby('TRACK_ID')['minimum']
-        min_average = np.repeat(average_minimum_groups.mean().to_numpy(), average_minimum_groups.count().to_numpy())
-
-        # Kick out all tracks with less than 70 % motility  @todo: make conditional
-        angle_radians_minimum = np.where(
-            min_average > 0.7,
-            df['minimum'],
-            0
-        ).astype(dtype=bool)
-        if angle_radians_minimum.sum():  # If there are any data points (0 == False):
-            all_angles_radians = angle_radians[np.array(angle_radians_minimum)]  # , dtype=bool
-            # print(stats.describe(all_angles_radians, nan_policy='omit'))
-            bins_number = settings['save angle distribution plot / bins']
-            bins = np.linspace(-np.pi, np.pi, bins_number + 1)
-            hist_array, _ = np.histogram(all_angles_radians, bins)
-            # plt.clf()
-            plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
-            ax = plt.subplot(1, 1, 1, projection='polar')
-            ax.set_theta_zero_location("N")  # theta=0 at the top
-            ax.set_theta_direction(-1)  # theta increasing clockwise
-            width = 2 * np.pi / bins_number
-            bars = ax.bar(
-                bins[:bins_number],
-                hist_array,
-                # height=,
-                width=width,
-                bottom=0.0,
-                # align='center',  # 'edge',  # x axis: 'edge': Align the left edges of the bars with the x positions.
-                # color='blue',
-                edgecolor='k',
-                # linewidth=,
-                # tick_label=,
-                # eclolr=,  # error bar color
-                # capsize=,  # error bar cap length
-                # error_kw=,  # dict of kwargs for error bar
-                # log=False,  # logarithmic y-axis
-            )
-            for bar in bars:
-                bar.set_alpha(0.5)
-            plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
-            plot_save_path_angle_histogram = save_path.format('angle_histogram', '.png')
-            plt.savefig(plot_save_path_angle_histogram, dpi=300)
-            logger.debug('Saving figure {}'.format(plot_save_path_angle_histogram))
-            plt.close()
-        else:
-            logger.warning('Cannot create angle distribution plot as there are no motile tracks.')
-
+        # takes angle_diff as rad
+        angle_distribution_plot(df=df,
+                                bins_number=settings['save angle distribution plot / bins'],
+                                plot_title_name=plot_title_name,
+                                save_path=save_path.format('angle_histogram', '.png')
+                                )
     min_angle = settings['minimal angle in degrees for turning point']
-    df['angle_diff'] = np.degrees(angle_radians)
+    df['angle_diff'] = np.degrees(df['angle_diff'])  # deg
     df['angle_diff'] = abs(df.groupby('TRACK_ID')['angle_diff'].diff().fillna(0))
     df['angle_diff'] = np.where(360 - df['angle_diff'] <= df['angle_diff'],
                                 360 - df['angle_diff'],
@@ -1024,7 +984,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     if settings['store generated statistical .csv file']:
         save_df_to_csv(df=df_stats, save_path=save_path.format('statistics', '.csv'))
-
+    # if not any([]):  @todo: if not any() check for remainder
+    #     return
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
     # total count
     all_entries = df_stats.shape[0]
@@ -1064,7 +1025,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     # Calculate df_stats_seaborne for statistical plots
     name_all_categories = 'All'
-    cut_off_list = [(-1, np.inf, name_all_categories),
+    cut_off_list = [(-1, np.inf, name_all_categories),  # @todo: get categories from user somehow
                     (-1, 0.02, '0 - 0.02'),
                     (0.02, 0.1, '0.02 - 0.1'),
                     # (0.2, 0.3, '0.2 - 0.3'),
@@ -1113,44 +1074,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     plt.rcParams.update({'font.size': 8})
     plt.rcParams['axes.axisbelow'] = True
     if settings['save large plots']:
-        # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
-        plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
-        plt.grid(True)
-        plt.axis('equal')
-        # display initial position
-        grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y'].transform('first')
-        plt.scatter(
-            grouped_df.POSITION_X,
-            grouped_df.POSITION_Y,
-            marker='o',
-            color='black',
-            s=1,
-            lw=0,
-        )
-        grouped_df = df.loc[
-                     :, ['TRACK_ID', 'distance_colour', 'POSITION_X', 'POSITION_Y', ]
-                     ].sort_values(['distance_colour'], ascending=False).groupby(
-            'TRACK_ID', sort=False)['POSITION_X', 'POSITION_Y', 'distance_colour']
-        for name, group in grouped_df:
-            plt.scatter(
-                group.POSITION_X,
-                group.POSITION_Y,
-                marker='.',
-                label=name,
-                c=plt.cm.gist_rainbow(group.distance_colour),
-                # vmin=distance_min,
-                # vmax=distance_max,
-                # cmap=plt.cm.gist_rainbow,
-                s=1,
-                lw=0,
-            )
-        del grouped_df
-        plt.title('{} Track count: {}'.format(plot_title_name, len(track_change)))
-        # save_path = '{}{}_Bac_Run_Overview.png'.format(results_directory, file_name)
-        plot_save_path_bac_run_overview = save_path.format('_Bac_Run_Overview', '.png')
-        plt.savefig(plot_save_path_bac_run_overview, dpi=300)
-        logger.debug('Saving figure {}'.format(plot_save_path_bac_run_overview))
-        plt.close()
+        save_large_plot(df=df,
+                        plot_title_name=plot_title_name,
+                        track_count=len(track_change),
+                        save_path=save_path.format('_Bac_Run_Overview', '.png')
+                        )
 
     f = plt.figure()
     # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
