@@ -46,7 +46,7 @@ from helper_file import (
     reshape_result,
     save_list,
     sort_list,
-)
+    save_df_to_csv)
 from tracker import CentroidTracker
 
 
@@ -122,7 +122,8 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
 
     # Set initial values; initialise result list
     old_list, list_name = save_list(file_path=pathname, filename=filename,
-                                    first_call=True, rename_old_list=settings['rename previous result .csv'])
+                                    first_call=True, rename_old_list=settings['rename previous result .csv'],
+                                    illumination=settings['include luminosity in tracking calculation'])
     # Save old_list_name for later if it exists; False otherwise
     ct = CentroidTracker()  # Initialise tracker instance
     coords = []  # Empty list to store calculated coordinates
@@ -312,7 +313,8 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
             # shift this block into previous for-loop if too many objects per frame causes problems
             # change list_save_length in tracking.ini if current value is an issue.
             # send coords off to be saved on drive:
-            save_list(coords=coords, file_path=pathname, filename=filename)
+            save_list(coords=coords, file_path=pathname, filename=filename,
+                      illumination=settings['include luminosity in tracking calculation'])
             coords = []  # reset coords list
 
         curr_frame_count += 1  # increase frame counter
@@ -342,7 +344,8 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
         #     break
 
     if coords:  # check if list is not empty ([] == False, otherwise True)
-        save_list(coords=coords, file_path=pathname, filename=filename)  # Save the remainder
+        save_list(coords=coords, file_path=pathname, filename=filename,
+                  illumination=settings['include luminosity in tracking calculation'])  # Save the remainder
 
     if settings['save video']:
         out.release()
@@ -805,15 +808,31 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
     #     df_passed_columns.extend(['WIDTH', 'HEIGHT', ])
     df = df.loc[df['good_track'] == 1, df_passed_columns]
     df.reset_index(inplace=True)
-    return evaluate_tracks(file_name=file_name, results_directory=results_directory,
+    return evaluate_tracks(path_to_file=path_to_file, results_directory=results_directory,
                            df=df, settings=settings, fps=fps)
 
 
-def evaluate_tracks(file_name, results_directory, df=None, settings=None, fps=None, ):
+def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps=None, ):
     logger = logging.getLogger('ei').getChild(__name__)
     settings = get_configs(settings)  # Get settings
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
+        return None
+    # Set up and check some basic stuff
+    if fps is None or fps <= 0 or settings['force tracking.ini fps settings']:
+        if settings['frames per second'] > 0:
+            fps = settings['frames per second']
+        else:
+            logger.critical('fps value is negative or zero; cannot continue.')
+            return None
+    file_name = os.path.basename(path_to_file)
+    file_name = os.path.splitext(file_name)[0]
+    if type(df) is not pd.core.frame.DataFrame:  # In case we didn't get a data frame
+        if settings['verbose']:
+            logger.debug('Handing string to get_data {}'.format(path_to_file))
+        df = get_data(path_to_file)
+    if df is None:  # get_data() returns None in case of errors
+        logger.critical('Error reading data frame from file {}'.format(path_to_file))
         return None
     diff_tracks_start, track_change = different_tracks(df)
     px_to_micrometre = settings['pixel per micrometre']
@@ -952,34 +971,10 @@ def evaluate_tracks(file_name, results_directory, df=None, settings=None, fps=No
     df['turn_points'] = np.where((df['angle_diff'] > min_angle) & (df['minimum'] == 1), 1, 0).astype(np.uint8)
 
     if settings['store processed .csv file']:
-        selected_data_csv = save_path.format('selected_data', '.csv')
-        try:
-            try:
-                old_selected_data_csv_path, old_selected_data_csv_ext = os.path.split(selected_data_csv)
-                old_selected_data_csv = '{}{}.{}'.format(
-                    old_selected_data_csv_path, datetime.now().strftime('%y%m%d%H%M%S'), old_selected_data_csv_ext
-                )
-                os.rename(selected_data_csv, old_selected_data_csv)
-                logger.critical('Old tracking.ini renamed to {}'.format(old_selected_data_csv))
-            except (FileNotFoundError, FileExistsError):
-                pass
-            except Exception as ex:
-                template = 'An exception of type {0} occurred while saving ' \
-                           'previous file {2} after sorting. Arguments:\n{1!r}'
-                logger.exception(template.format(type(ex).__name__, ex.args, selected_data_csv))
-            finally:
-                pass
-            with open(selected_data_csv, 'w+', newline='\n') as csv:  # save again as csv
-                df.loc[:,
+        save_df_to_csv(df=df.loc[:,
                        ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT',
-                        'travelled_dist', 'angle_diff', 'turn_points',
-                        ]].to_csv(csv, index=False, encoding='utf-8')
-            logger.info('Selected results saved to: {}'.format(selected_data_csv))
-        except Exception as ex:
-            template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
-            logger.exception(template.format(type(ex).__name__, ex.args, selected_data_csv))
-        finally:
-            pass
+                        'travelled_dist', 'angle_diff', 'turn_points', ]],
+                       save_path=save_path.format('selected_data', '.csv'))
 
     df['x_norm'] = (df['POSITION_X'].sub(df.groupby('TRACK_ID')['POSITION_X'].transform('first'))) / px_to_micrometre
     df['y_norm'] = (df['POSITION_Y'].sub(df.groupby('TRACK_ID')['POSITION_Y'].transform('first'))) / px_to_micrometre
@@ -1028,31 +1023,7 @@ def evaluate_tracks(file_name, results_directory, df=None, settings=None, fps=No
     del turn_percent_series, dist_series, speed_series, time_series, pdist_series, motile_series
 
     if settings['store generated statistical .csv file']:
-        df_stats_csv = save_path.format('statistics', '.csv')
-        try:
-            try:
-                old_df_stats_csv_path, old_df_stats_csv_ext = os.path.split(df_stats_csv)
-                old_selected_data_csv = '{}{}.{}'.format(
-                    old_df_stats_csv_path, datetime.now().strftime('%y%m%d%H%M%S'), old_df_stats_csv_ext
-                )
-                os.rename(df_stats_csv, old_selected_data_csv)
-                logger.critical('Old tracking.ini renamed to {}'.format(old_selected_data_csv))
-            except (FileNotFoundError, FileExistsError):
-                pass
-            except Exception as ex:
-                template = 'An exception of type {0} occurred while saving ' \
-                           'previous file {2} after sorting. Arguments:\n{1!r}'
-                logger.exception(template.format(type(ex).__name__, ex.args, df_stats_csv))
-            finally:
-                pass
-            with open(df_stats_csv, 'w+', newline='\n') as csv:  # save again as csv
-                df_stats.to_csv(csv, index=False, encoding='utf-8')
-            logger.info('Selected results saved to: {}'.format(df_stats_csv))
-        except Exception as ex:
-            template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
-            logger.exception(template.format(type(ex).__name__, ex.args, df_stats_csv))
-        finally:
-            pass
+        save_df_to_csv(df=df_stats, save_path=save_path.format('statistics', '.csv'))
 
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
     # total count
@@ -1125,6 +1096,7 @@ def evaluate_tracks(file_name, results_directory, df=None, settings=None, fps=No
         {value: key for key, value in zip([i for (_, _, i) in cut_off_list[1:]], range(1, len(cut_off_list)))},
         inplace=True)
 
+    # Put name_all_categories and assigned categories in one df
     df_stats_seaborne = pd.concat([df_stats, df_stats_seaborne], ignore_index=True)
 
     # Get name of categories, assign values in ascending order, sort df_stats_seaborne['Categories'] by order/dict
@@ -1400,7 +1372,7 @@ def evaluate_tracks(file_name, results_directory, df=None, settings=None, fps=No
     return end_string
 
 
-# @todo: roll into select_tracks
+# @todo: create ysmr()
 def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None,
                 results_directory=None, settings=None, create_logger=True, ):
     logger = logging.getLogger('ei').getChild(__name__)
@@ -1420,7 +1392,7 @@ def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width
                     logfile_name=settings['log file path'],
                     short_stream_output=settings['shorten displayed logging output'],
                     short_file_output=settings['shorten logfile logging output'],
-                    log_to_file=settings['log to file'],)
+                    log_to_file=settings['log to file'], )
     end_string = None
     if results_directory is None:
         results_directory = create_results_folder(path=path_to_files)

@@ -17,7 +17,6 @@ not, see <http://www.gnu.org/licenses/>.
 import logging
 import multiprocessing as mp
 import os
-import subprocess
 import sys
 from datetime import datetime
 from time import sleep
@@ -35,7 +34,7 @@ from helper_file import (
     get_base_path,
     get_configs,
     get_loggers,
-)
+    shutdown)
 from like_a_record_baby import track_bacteria  # , start_it_up,
 
 if __name__ == '__main__':
@@ -218,32 +217,7 @@ if __name__ == '__main__':
     _backup()
 
     if settings['shut down after analysis']:
-        if os.name is 'nt':   # windows
-            try:
-                shutdown_time = 60
-                response = subprocess.run('shutdown -f -s -t {}'.format(shutdown_time), stderr=subprocess.PIPE)
-                response.check_returncode()
-                logger.warning('Calling \'shutdown -f -s -t {0}\' on system, '
-                               'shutting down in {0} s'.format(shutdown_time))
-                logger.info('Type \'shutdown -a\' in command console to abort shutdown.')
-            except (OSError, FileNotFoundError, subprocess.CalledProcessError) as os_shutdown_error:
-                logger.exception('Error during shutdown: {}'.format(os_shutdown_error))
-            finally:
-                pass
-        else:  # @todo: untested
-            try:
-                response = subprocess.run('systemctl poweroff', stderr=subprocess.PIPE)
-                response.check_returncode()
-                logger.warning('Calling \'systemctl poweroff\' on system.')
-            except (OSError, FileNotFoundError, subprocess.CalledProcessError) as os_shutdown_error:
-                try:
-                    response = subprocess.run('sudo shutdown -h +1', stderr=subprocess.PIPE)
-                    response.check_returncode()
-                    logger.warning('Calling \'sudo shutdown -h +1\' on system.')
-                except (OSError, FileNotFoundError, subprocess.CalledProcessError) as os_shutdown_error:
-                    logger.exception('Error during shutdown: {}'.format(os_shutdown_error))
-            finally:
-                pass
+        shutdown()
     logger.info('Elapsed time: {}\n{}\n'.format(elapsed_time(t_one), filler_for_logger))
     queue_listener.stop()
     sys.exit(0)

@@ -28,31 +28,14 @@ from itertools import cycle as cycle
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from tkinter import filedialog, Tk
-from time import sleep, strftime, localtime
+from time import strftime, localtime
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.signal import argrelextrema
 
 _config = configparser.ConfigParser(allow_no_value=True)
-
-
-def argrelextrema_groupby(group, comparator=np.less_equal, order=15, shift=False, shift_range=4):
-    result = np.zeros(group.shape[0], dtype=np.int8)
-    # @todo: changed .values to .array
-    np.put(result, argrelextrema(group.array, comparator, order=order)[0], 1)
-    if shift:
-        result_comp = result
-        for d_shift in range(-1, -(shift_range + 1)):
-            query = shift_np_array(result_comp, d_shift, 0)
-            result = np.where((
-                (result == 1) &
-                (query == 1),
-                0, result))
-    group = np.where(result == 1, group.array, 0)
-    return group
 
 
 def bytes_to_human_readable(number_of_bytes):
@@ -65,7 +48,7 @@ def bytes_to_human_readable(number_of_bytes):
     if number_of_bytes < 0:  # assert number_of_bytes >= 0, 'Negative bytes passed'
         return 'Negative Bytes'  # As this isn't / shouldn't be used anywhere important, this suffices
     bytes_in_a_kb = 1024  # 2**10, as it should be
-    units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']  # Update as needed
+    units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB', ]  # Update as needed
     for unit in units:  # Go through each unit
         if number_of_bytes / bytes_in_a_kb < 1 or unit == units[-1]:
             break  # stop if division would go below 1 or end of list is reached
@@ -77,8 +60,7 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
     logger = logging.getLogger('ei').getChild(__name__)
     try:
         import xlsxwriter
-    except ImportError as error:
-        logger.exception(error)
+    except ImportError:
         logger.warning('Could not import module \'xlsxwriter\', saving as .xlsx file is not possible.')
         return
     if save_path is None:
@@ -113,6 +95,9 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
 
 def create_configs():
     logger = logging.getLogger('ei').getChild(__name__)
+    # path = os.path.join(os.path.expanduser("~"), '.config/ysmr')
+    # import xdg -> ~/$XDG_CONFIG_HOME/ysmr
+    # %APPDATA%: path = os.getenv('APPDATA') + ysmr
     configfilepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
     try:
         old_tracking_ini = '{}.{}'.format(configfilepath, datetime.now().strftime('%y%m%d%H%M%S'))
@@ -659,7 +644,10 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                           '{process:>5}:\t' \
                           '{message}'
     # '{filename:18:18}\t' \
-    short_format_logging = '{asctime:}\t{levelname:8.8}\t{process:>5}:\t{message}'
+    short_format_logging = '{asctime:}\t' \
+                           '{levelname:8.8}\t' \
+                           '{process:>5}:\t' \
+                           '{message}'
     # Sets the global logging format.
     logging.basicConfig(format=(long_format_logging, ), style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"
     queue_listener = None
@@ -750,7 +738,7 @@ def get_data(csv_file_path, dtype=None):
     return data
 
 
-def logfile_padding(logfile, breaker=0):
+def logfile_padding(logfile, iteration=0):
     with open(logfile, 'r+') as file:
         for line in file:
             pass  # get to last line
@@ -761,8 +749,8 @@ def logfile_padding(logfile, breaker=0):
                 return
         else:
             return
-    if breaker < 2:  # so we don't accidentally fill the file with empty lines if anything goes wrong
-        logfile_padding(logfile, breaker=breaker + 1)
+    if iteration < 2:  # so we don't accidentally fill the file with empty lines if anything goes wrong
+        logfile_padding(logfile, iteration=iteration + 1)
 
 
 def _mkdir(new_directory):
@@ -780,7 +768,8 @@ def _mkdir(new_directory):
     if os.path.isdir(new_directory):
         pass
     elif os.path.isfile(new_directory):
-        raise OSError("a file with the same name as the desired dir, '%s', already exists." % new_directory)
+        raise OSError('A file with the same name as the desired dir, '
+                      '\'{}\', already exists.'.format(new_directory))
     else:
         head, tail = os.path.split(new_directory)
         if head and not os.path.isdir(head):
@@ -797,8 +786,36 @@ def reshape_result(tuple_of_tuples, *args):
     return tuple(coordinates), additional_info
 
 
-def save_list(file_path, filename, coords=None, first_call=False, rename_old_list=True):
-    logger_save_list = logging.getLogger('ei.' + __name__)
+def save_df_to_csv(df, save_path):
+    logger = logging.getLogger('ei').getChild(__name__)
+    try:
+        old_df_path, old_df_ext = os.path.split(save_path)
+        old_csv = '{}{}.{}'.format(
+            old_df_path, datetime.now().strftime('%y%m%d%H%M%S'), old_df_ext
+        )
+        os.rename(save_path, old_csv)
+        logger.critical('Old {} renamed to {}'.format(os.path.basename(save_path), old_csv))
+    except (FileNotFoundError, FileExistsError):
+        pass
+    except Exception as ex:
+        template = 'An exception of type {0} occurred while saving ' \
+                   'previous file {2} after sorting. Arguments:\n{1!r}'
+        logger.exception(template.format(type(ex).__name__, ex.args, save_path))
+    finally:
+        pass
+    try:
+        with open(save_path, 'w+', newline='\n') as csv:  # save again as csv
+            df.to_csv(csv, index=False, encoding='utf-8')
+        logger.info('Selected results saved to: {}'.format(save_path))
+    except Exception as ex:
+        template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
+        logger.exception(template.format(type(ex).__name__, ex.args, save_path))
+    finally:
+        pass
+
+
+def save_list(file_path, filename, coords=None, first_call=False, rename_old_list=True, illumination=False):
+    logger = logging.getLogger('ei').getChild(__name__)
     file_csv = '{}/{}_list.csv'.format(file_path, filename)
 
     if first_call:  # set up .csv file
@@ -809,22 +826,29 @@ def save_list(file_path, filename, coords=None, first_call=False, rename_old_lis
                 old_filename, old_file_extension = os.path.splitext(file_csv)
                 old_list = '{}_{}{}'.format(old_filename, now, old_file_extension)
                 os.rename(file_csv, old_list)  # rename file
-                logger_save_list.info('Renaming old results to {}.'.format(old_list))
+                logger.info('Renaming old results to {}.'.format(old_list))
             else:
-                logger_save_list.warning('Overwriting old results without saving: {}'.format(file_csv))
+                logger.warning('Overwriting old results without saving: {}'.format(file_csv))
                 os.remove(file_csv)
         with open(file_csv, 'w+', newline='') as file:
-            file.write('TRACK_ID,POSITION_T,POSITION_X,POSITION_Y,WIDTH,HEIGHT,DEGREES_ANGLE\n')  # first row
+            if not illumination:
+                file.write('TRACK_ID,POSITION_T,POSITION_X,POSITION_Y,WIDTH,HEIGHT,DEGREES_ANGLE\n')  # first row
+            else:
+                file.write('TRACK_ID,POSITION_T,POSITION_X,POSITION_Y,WIDTH,HEIGHT,DEGREES_ANGLE,ILLUMINATION\n')
         return old_list, file_csv
 
     if coords:  # Check if we actually received something
         # @todo: sort coords here to speed up sorting process later?
         string_holder = ''  # Create empty string to which rows are appended
+        illum = 0
         for item in coords:
             # convert tuple first into single parts, then to .csv row
             frame, obj_id, xy, (w, h, deg) = item
-            x, y = xy[:2]  # in case of (x, y, illumination)
-            curr_string = '{0},{1},{2},{3},{4},{5},{6}\n'.format(
+            if not illumination:
+                x, y = xy[:2]  # in case of (x, y, illumination)
+            else:
+                x, y, illum = xy[:3]
+            curr_string = '{0},{1},{2},{3},{4},{5},{6}'.format(
                 int(obj_id),  # 0  # Appeared sometimes as float; intercepted here
                 int(frame),  # 1
                 x,  # 2
@@ -833,6 +857,10 @@ def save_list(file_path, filename, coords=None, first_call=False, rename_old_lis
                 h,  # 5
                 deg  # 6
             )
+            if illumination:
+                curr_string = '{},{}\n'.format(curr_string, illum)
+            else:
+                curr_string = '{}\n'.format(curr_string)
             string_holder += curr_string  # append row
         with open(file_csv, 'a', newline='') as file:  # append rows to .csv file
             file.write(string_holder)
@@ -908,7 +936,7 @@ def sort_list(file_path=None, sort=None, df=None, save_file=True):
         try:
             with open(file_path, 'w+', newline='\n') as csv:  # save again as csv
                 df.to_csv(csv, index=False)
-            logger.info('Results saved to: {}'.format(file_path))
+            logger.debug('Sorted results saved to: {}'.format(file_path))
         except Exception as ex:
             template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
             logger.exception(template.format(type(ex).__name__, ex.args, file_path))
@@ -918,15 +946,37 @@ def sort_list(file_path=None, sort=None, df=None, save_file=True):
     return df
 
 
+def shutdown(seconds=60):
+    logger = logging.getLogger('ei').getChild(__name__)
+    if os.name is 'nt':  # windows
+        try:
+            response = subprocess.run('shutdown -f -s -t {}'.format(seconds), stderr=subprocess.PIPE)
+            response.check_returncode()
+            logger.warning('Calling \'shutdown -f -s -t {0}\' on system, '
+                           'shutting down in {0} s'.format(seconds))
+            logger.info('Type \'shutdown -a\' in command console to abort shutdown.')
+        except (OSError, FileNotFoundError, subprocess.CalledProcessError) as os_shutdown_error:
+            logger.exception('Error during shutdown: {}'.format(os_shutdown_error))
+        finally:
+            pass
+    else:  # @todo: untested
+        try:
+            response = subprocess.run('systemctl poweroff', stderr=subprocess.PIPE)
+            response.check_returncode()
+            logger.warning('Calling \'systemctl poweroff\' on system.')
+        except (OSError, FileNotFoundError, subprocess.CalledProcessError):
+            try:
+                response = subprocess.run('sudo shutdown -h +1', stderr=subprocess.PIPE)
+                response.check_returncode()
+                logger.warning('Calling \'sudo shutdown -h +1\' on system.')
+            except (OSError, FileNotFoundError, subprocess.CalledProcessError) as os_shutdown_error:
+                logger.exception('Error during shutdown: {}'.format(os_shutdown_error))
+        finally:
+            pass
+
+
 if __name__ == '__main__':
     get_loggers(log_to_file=False, short_stream_output=True)
     _backup(skip_check_time=False)
     create_configs()
-    dic = get_configs()
-    sleep(0.3)
-    if dic is not None:
-        for key in dic:
-            print(key, ': ', dic[key])
-            if dic[key] is None:
-                print('{} : MISSING/NO_VALUE'.format(key))
-    sys.exit()
+    sys.exit(0)
