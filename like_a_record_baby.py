@@ -97,7 +97,8 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if frame_count < settings['minimal frame count']:
-        logger.warning('File {} too short; file was skipped.'.format(curr_path))
+        logger.warning('File {} too short; file was skipped. Limit for \'minimal frame count\': {}'.format(
+            curr_path, settings['minimal frame count']))
         return None
     try:  # @todo: force tracking.ini fps settings
         fps_of_file = cap.get(cv2.CAP_PROP_FPS)
@@ -122,8 +123,10 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     logger.info('Starting with file {}'.format(curr_path))
 
     # Set initial values; initialise result list
-    old_list, list_name = save_list(file_path=pathname, filename=filename,
-                                    first_call=True, rename_old_list=settings['rename previous result .csv'],
+    old_list, list_name = save_list(file_path=pathname,
+                                    filename=filename,
+                                    first_call=True,
+                                    rename_old_list=settings['rename previous result .csv'],
                                     illumination=settings['include luminosity in tracking calculation'])
     # Save old_list_name for later if it exists; False otherwise
     ct = CentroidTracker(max_disappeared=fps_of_file)  # Initialise tracker instance
@@ -157,7 +160,7 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
                               )
     # min_frame_count += skip_frames
     while True:  # Loop over video
-        # if cv2.waitKey(1) & 0xFF == ord('n'):  # frame-by-frame (Put entire following block into this if clause)
+        # if cv2.waitKey(1) & 0xFF == ord('n'):  # frame-by-frame
         timer = cv2.getTickCount()
         ret, frame = cap.read()  # ret: True/False, depends on whether another frame could be retrieved
         # frame: the actual current frame
