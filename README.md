@@ -17,6 +17,26 @@ Python 3.5 or higher
 Optional:
 + XlsxWriter
 
+#### Files in this package:
++ \_\_init\_\_.py
+    + empty
++ \_\_version\_\_.py
+    + version file
++ helper_file.py
+    + contains various functions used throughout YSMR
++ LICENSE
+    + The license under which YSMR is published
++ plot_functions.py
+    + plotting functions which are used to create graphs
++ REAMDE.md
+    + this file
++ track_eval.py
+    + tracking, selection, and evaluation functions of YSMR
++ tracker.py
+    + the tracker used by YSMR
++ YSMR.py
+    + The file which starts YSMR
+
 ## Usage
 
 ## Explanation of tracking.ini file
