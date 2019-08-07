@@ -44,6 +44,10 @@ def bytes_to_human_readable(number_of_bytes):
     Returns string containing bytes, rounded to 1 decimal place,
     with unit prefix as defined by SI.
     For documentation purposes only.
+    :param number_of_bytes: bytes to convert
+    :type number_of_bytes: int
+    :return: the readable number as text
+    :rtype: str
     """
     if number_of_bytes < 0:  # assert number_of_bytes >= 0, 'Negative bytes passed'
         return 'Negative Bytes'  # As this isn't / shouldn't be used anywhere important, this suffices
@@ -57,6 +61,13 @@ def bytes_to_human_readable(number_of_bytes):
 
 
 def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statistics.csv'):
+    """
+    Saves all available csv files ending in the specified csv_extension into one xlsx
+    :param path: folder with csv files
+    :param save_path: output folder
+    :param csv_extension: extension of .csv files
+    :return: None
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     try:
         import xlsxwriter
@@ -94,6 +105,10 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
 
 
 def create_configs():
+    """
+    generates the tracking.ini config file and tries to open it for editing.
+    :return: None
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     # path = os.path.join(os.path.expanduser("~"), '.config/ysmr')
     # import xdg -> ~/$XDG_CONFIG_HOME/ysmr
@@ -279,6 +294,15 @@ def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=0, time_d
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
+    """
+    Checks if logfile is above specified size and does a rollover if necessary
+    If not, checks if file is padded with empty lines and adds some if necessary
+    :param path: path to logfile
+    :param max_size: maximal size of logfile in bytes
+    :type max_size: int
+    :return: log-file path
+    :rtype: str
+    """
     # RotatingFileHandler does the same but can't do the
     # rollover when used with multiprocess, so we create our own approximation
     if os.path.isfile(path):
@@ -316,6 +340,11 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
 
 
 def create_results_folder(path):
+    """
+    creates a dated result folder in provided path
+    :param path: path to folder
+    :return: path to result folder
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     folder_time = str(strftime('%y%m%d', localtime()))
     dir_form = '{}/{}_Results/'  # @todo: specify results folder
@@ -343,11 +372,15 @@ def create_results_folder(path):
 
 def creation_date(path_to_file):
     """
-    Try to get the date that a file was created, falling back to when it was
-    last modified if that isn't possible.
+    checks the creation date of the provided file
     See for explanation/source:
     https://stackoverflow.com/a/39501288/1709587
     Accessed last 2019-03-01 13:37:00,101
+    :param path_to_file: path to file
+    :return: time since file creation in seconds
+    :rtype: int
+    Try to get the date that a file was created, falling back to when it was
+    last modified if that isn't possible.
     """
     if os.path.isfile(path_to_file):
         now = datetime.now()
@@ -369,7 +402,14 @@ def creation_date(path_to_file):
 
 
 def different_tracks(data, column='TRACK_ID'):
-    # search for individual tracks; return lists of starts/stops
+    """
+    check for changes in column, return lists of starts/stops
+    :param data: pandas data frame
+    :param column: column to be checked for changes
+    :return: list of start IDs, list of stop IDs
+    :rtype starts: list
+    :rtype stops: list
+    """
     track_id = data[column].array
     # get np.ndarray with the values where track changes occur
     # by comparing every element with the previous one
@@ -382,6 +422,11 @@ def different_tracks(data, column='TRACK_ID'):
 
 
 def elapsed_time(time_one):
+    """
+    rough measure for elapsed time since time_one
+    :param time_one: start time
+    :return: time difference
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     time_two = datetime.now()
     try:
@@ -392,14 +437,24 @@ def elapsed_time(time_one):
     return time_delta
 
 
-def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, recursive=True, settings=None):
+def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursive=True):
+    """
+    Search for files in provided path
+    :param base_path: path which is checked for files
+    :param extension: extension or ending of files
+    :type extension: str
+    :param minimal_age: minimal file age in seconds
+    :type minimal_age: int
+    :param maximal_age: maximal file age in seconds
+    :param recursive: whether to check sub-folders
+    :type recursive: bool
+    :return: list of files
+    """
     # @todo: extension -> list; for-loop for ext.
     logger = logging.getLogger('ei').getChild(__name__)
     if not os.path.exists(base_path):
         logger.critical('Path could not be found: {}'.format(base_path))
         return None
-    if extension is None:
-        extension = settings['VIDEO_SETTINGS'].get('extension', fallback='.mp4')
     if base_path[-1] != '/':
         base_path = '{}/'.format(base_path)
 
@@ -426,10 +481,20 @@ def find_paths(base_path, extension=None, minimal_age=0, maximal_age=np.inf, rec
 
 
 def get_base_path(rename=False, prev_dir=None):
+    """
+    Prompt user to provide folder path via tkinter window
+    :param rename: whether to rename the base-path in tracking.ini
+    :type rename: bool
+    :param prev_dir: previous directory
+    :return: path
+    """
     # @todo: get PyQT instead?
     logger = logging.getLogger('ei').getChild(__name__)
     if prev_dir is None:
-        prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
+        try:
+            prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
+        except configparser.Error:
+            prev_dir = './'
     try:
         root = Tk()
         root.overrideredirect(1)  # hide the root window
@@ -462,6 +527,12 @@ def get_colour_map(counts, colour_map=plt.cm.gist_rainbow):
 
 
 def get_configs(tracking_ini_filepath=None):
+    """
+    Read tracking.ini, convert to dict
+    :param tracking_ini_filepath: filepath for tracking.ini
+    :return: configs as dict
+    :rtype: dict
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
         return tracking_ini_filepath
@@ -632,6 +703,19 @@ def get_configs(tracking_ini_filepath=None):
 
 def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                 short_stream_output=False, short_file_output=False, log_to_file=False):
+    """
+    looks if loggers are already set up, creates new ones if they are missing
+    workaround for multiprocessing logging
+    :param log_level: minimal logging level
+    :param logfile_name: file for logging.Filehandler
+    :param short_stream_output: shorten the sys.stdout output
+    :type short_file_output: bool
+    :param short_file_output: shorten the logging.Filehandler output
+    :type short_file_output: bool
+    :param log_to_file: whether to use a logfile
+    :type log_to_file: bool
+    :return: logging queue, longest used logging format
+    """
     # The loggers name is "ei". This is german for "egg". There is no good reason for this.
     logger = logging.getLogger('ei')
     logger.propagate = False
@@ -694,6 +778,13 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
 
 
 def get_data(csv_file_path, dtype=None):
+    """
+    load csv file to pandas data frame
+    :param csv_file_path: csv file to read
+    :param dtype: dict of columns to be loaded and their data types
+    :type dtype: dict
+    :return: pandas data frame
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     if type(csv_file_path) is not (str or os.PathLike or bytes) and (list or tuple):
         csv_file_path = csv_file_path[0]
@@ -738,7 +829,94 @@ def get_data(csv_file_path, dtype=None):
     return data
 
 
+def log_infos(settings, format_for_logging=None):
+    """Logging output for several options set in settings.
+
+    :param settings: settings dict from get_configs()
+    :type settings: dict
+    :param format_for_logging: logging format string
+    :type format_for_logging: str
+    :return: None
+    """
+    logger = logging.getLogger('ei').getChild(__name__)
+    # Log some general stuff
+    if format_for_logging is None:
+        format_for_logging = '{asctime:}\t' \
+                             '{name:21.21}\t' \
+                             '{funcName:14.14}\t' \
+                             '{lineno:>4}\t' \
+                             '{levelname:8.8}\t' \
+                             '{process:>5}:\t' \
+                             '{message}'
+    explain_logger_setup = format_for_logging.format(**{
+        'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
+        'name': 'logger name',
+        'funcName': 'function name',
+        'filename': 'file name',
+        'lineno': 'lNr',
+        'levelname': 'level',
+        'process': 'PID',
+        'message': 'Message (lNr: line number, PID: Process ID)'
+    })
+    filler_for_logger = ''
+    for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
+        filler_for_logger += '#' * len(sub_string) + '\t'
+    filler_for_logger = filler_for_logger[:-1]  # remove last tab
+    logger.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
+
+    # Warnings
+    if settings['shut down after analysis']:
+        logger.warning('Shutting down PC after files have been processed')
+    if settings['debugging']:
+        logger.warning('Test settings enabled')
+    if not cv2.useOptimized():
+        logger.warning('Running cv2 unoptimised')
+    if not settings['rename previous result .csv']:
+        logger.warning('Old .csv result lists will be overwritten')
+    if settings['delete .csv file after analysis']:
+        logger.warning('Generated .csv files will be deleted after analysis')
+    if settings['select files']:
+        if not settings['debugging']:
+            logger.info('Manually selecting files enabled')
+        else:
+            logger.warning('Manually selecting files disabled due to test setting')
+    # Infos
+    if settings['verbose']:
+        logger.info('Verbose enabled, logging set to debug.')
+    else:
+        logger.info('Log level set to {}'.format(settings['set logging level (debug/info/warning/critical)']))
+    if settings['display video analysis']:
+        logger.info('Displaying videos')
+    if settings['save video']:
+        logger.info('Saving detection video files')
+    if settings['include luminosity in tracking calculation']:
+        logger.info('Use average luminosity for distance calculation enabled - '
+                    'processing time per video may increase notably')
+    if settings['limit track length to x seconds']:  # 0 is false; otherwise true
+        logger.info('Maximal track length for evaluation set to {} s'.format(
+            settings['limit track length to x seconds']))
+    else:
+        logger.info('Full track length will be used in evaluation')
+    if settings['maximal video file age (infinite or seconds)'] == np.inf:
+        logger.debug('maximal video file age (infinite or seconds) set to infinite')
+    else:
+        logger.debug('maximal video file age (infinite or seconds) set to {}'.format(
+            settings['maximal video file age (infinite or seconds)']))
+
+    # Debug messages
+    logger.debug('White bacteria on dark background set to {}'.format(
+        settings['white bacteria on dark background']))
+    logger.debug('List save length set to {} entries'.format(settings['list save length interval']))
+    logger.debug('Pixel/micrometre: {}'.format(settings['pixel per micrometre']))
+
+
 def logfile_padding(logfile, iteration=0):
+    """
+    pads text file with max. two empty lines if it doesn't have one at the end
+    :param logfile: path to file
+    :param iteration: internal iteration counter
+    :return: None
+    """
     with open(logfile, 'r+') as file:
         for line in file:
             pass  # get to last line
@@ -764,6 +942,8 @@ def _mkdir(new_directory):
         Author: Trent Mick
         - https://code.activestate.com/recipes/82465-a-friendly-mkdir/
         Accessed last 2019-06-04 13:37:00,101
+    :param new_directory: file path to be created
+    :return: None
     """
     if os.path.isdir(new_directory):
         pass
@@ -779,6 +959,12 @@ def _mkdir(new_directory):
 
 
 def reshape_result(tuple_of_tuples, *args):
+    """
+    reshape tuple of tuples into (x, y, *args) and (width, height, degrees_orientation)
+    :param tuple_of_tuples: (x, y), (w, h), degrees_orientation
+    :param args: additional parameters are added to coordinates
+    :return: (x, y, *args), (width, height, degrees_orientation)
+    """
     (x, y), (w, h), degrees_orientation = tuple_of_tuples  # ((x, y), (w, h), additional_info), xy is centroid
     additional_info = (w, h, degrees_orientation)
     coordinates = [x, y]
@@ -787,6 +973,12 @@ def reshape_result(tuple_of_tuples, *args):
 
 
 def save_df_to_csv(df, save_path):
+    """
+    save data frame to csv file
+    :param df: pandas data frame
+    :param save_path: path to csv file
+    :return: None
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     try:
         old_df_path, old_df_ext = os.path.split(save_path)
@@ -815,6 +1007,20 @@ def save_df_to_csv(df, save_path):
 
 
 def save_list(file_path, filename, coords=None, first_call=False, rename_old_list=True, illumination=False):
+    """
+    Create csv file for results from track_bacteria(), append results
+    :param file_path: path to folder
+    :param filename: .csv file name
+    :param coords: list of coordinate tuples
+    :type coords: list
+    :param first_call: whether to create .csv with header
+    :type first_call: bool
+    :param rename_old_list: whether to rename old .csv with identical name, if it exists
+    :type rename_old_list: bool
+    :param illumination: whether to save illumination to .csv
+    :type illumination: bool
+    :return: first_call returns old_list string if it existed and .csv file path
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     file_csv = '{}/{}_list.csv'.format(file_path, filename)
 
@@ -868,6 +1074,11 @@ def save_list(file_path, filename, coords=None, first_call=False, rename_old_lis
 
 
 def set_different_colour_filter(colour_filter_new):
+    """
+    sets a new cv2 colour filter
+    :param colour_filter_new: name of colour filter
+    :return: cv2 colour filter
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     logger.warning('Setting colour filter to {}'.format(colour_filter_new))
     flags = [flag for flag in dir(cv2) if flag.startswith('COLOR_')]  # get all possible flags
@@ -900,6 +1111,12 @@ def shift_np_array(arr, shift, fill_value=np.nan):
     # See origin:
     # https://stackoverflow.com/questions/30399534/shift-elements-in-a-numpy-array
     # Accessed last 2019-04-24 13:37:00,101
+
+    :param arr: array to be shifted
+    :param shift: shift by amount
+    :type shift: int
+    :param fill_value: fill value
+    :return: shifted array
     """
     result = np.empty_like(arr)
     if shift > 0:
@@ -914,6 +1131,16 @@ def shift_np_array(arr, shift, fill_value=np.nan):
 
 
 def sort_list(file_path=None, sort=None, df=None, save_file=True):
+    """
+    sorts pandas data frame, optionally saves it and loads it from csv
+    :param file_path: file path to save .csv to
+    :param sort: list of columns to sort by
+    :type sort: list
+    :param df: optional pandas data frame to be sorted
+    :param save_file: whether to save the sorted file
+    :type save_file: bool
+    :return: sorted pandas data frame
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     if sort is None:
         sort = ['TRACK_ID', 'POSITION_T']
@@ -947,6 +1174,12 @@ def sort_list(file_path=None, sort=None, df=None, save_file=True):
 
 
 def shutdown(seconds=60):
+    """
+    attempts to shut down the computer
+    :param seconds: seconds before shutdown on windows
+    :type seconds: int
+    :return: None
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     if os.name is 'nt':  # windows
         try:
