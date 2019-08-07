@@ -534,167 +534,167 @@ def get_configs(tracking_ini_filepath=None):
     :rtype: dict
     """
     logger = logging.getLogger('ei').getChild(__name__)
-    if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
-        return tracking_ini_filepath
-    if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
-        _config.read(tracking_ini_filepath)
     settings_dict = None
-    try:
-        basic_recording = _config['BASIC RECORDING SETTINGS']
-        basic_track = _config['BASIC TRACK DATA ANALYSIS SETTINGS']
-        display = _config['DISPLAY SETTINGS']
-        results = _config['RESULTS SETTINGS']
-        log_settings = _config['LOGGING SETTINGS']
-        adv_video = _config['ADVANCED VIDEO SETTINGS']
-        adv_track = _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
-        housekeeping = _config['HOUSEKEEPING']
-        test = _config['TEST SETTINGS']
-
-        verbose = log_settings.getboolean('verbose')
-        set_log_level = log_settings.get('set logging level (debug/info/warning/critical)')
-        log_levels = {'debug': logging.DEBUG,
-                      'info': logging.INFO,
-                      'warning': logging.WARNING,
-                      'critical': logging.CRITICAL}
-        set_log_level_setting = logging.DEBUG  # fallback
-        if not verbose:  # if verbose logging is set to DEBUG
-            if set_log_level.lower() in log_levels.keys():
-                set_log_level_setting = log_levels[set_log_level.lower()]
-            else:
-                logger.warning('Logging level passed argument: {}. '.format(set_log_level) +
-                               'Argument not recognised. Logging set to debug. Accepted arguments: ' +
-                               ''.join('{} '.format(format_level) for format_level in log_levels.keys()))
-        rod_shaped_bac = basic_recording.getboolean('rod shaped bacteria')
-        if rod_shaped_bac:
-            min_size_ratio = adv_track.getfloat('rod average width/height ratio min.')
-            max_size_ratio = adv_track.getfloat('rod average width/height ratio max.')
-        else:
-            min_size_ratio = adv_track.getfloat('coccoid average width/height ratio min.')
-            max_size_ratio = adv_track.getfloat('coccoid average width/height ratio max.')
-        colour_filter = adv_video.get('color filter')
-        if colour_filter != 'COLOR_BGR2GRAY':
-            colour_filter = set_different_colour_filter(colour_filter)
-        else:
-            colour_filter = cv2.COLOR_BGR2GRAY
-        max_vid_age = adv_video.get('maximal video file age (infinite or seconds)')
+    if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
+        settings_dict = tracking_ini_filepath
+    else:
+        if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
+            _config.read(tracking_ini_filepath)
         try:
-            max_vid_age = int(max_vid_age)
-        except ValueError as max_vid_age_value_error:
-            if max_vid_age.lower() in 'infinite':
-                max_vid_age = np.inf
+            basic_recording = _config['BASIC RECORDING SETTINGS']
+            basic_track = _config['BASIC TRACK DATA ANALYSIS SETTINGS']
+            display = _config['DISPLAY SETTINGS']
+            results = _config['RESULTS SETTINGS']
+            log_settings = _config['LOGGING SETTINGS']
+            adv_video = _config['ADVANCED VIDEO SETTINGS']
+            adv_track = _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
+            housekeeping = _config['HOUSEKEEPING']
+            test = _config['TEST SETTINGS']
+
+            verbose = log_settings.getboolean('verbose')
+            set_log_level = log_settings.get('set logging level (debug/info/warning/critical)')
+            log_levels = {'debug': logging.DEBUG,
+                          'info': logging.INFO,
+                          'warning': logging.WARNING,
+                          'critical': logging.CRITICAL}
+            set_log_level_setting = logging.DEBUG  # fallback
+            if not verbose:  # if verbose logging is set to DEBUG
+                if set_log_level.lower() in log_levels.keys():
+                    set_log_level_setting = log_levels[set_log_level.lower()]
+                else:
+                    logger.warning('Logging level passed argument: {}. '.format(set_log_level) +
+                                   'Argument not recognised. Logging set to debug. Accepted arguments: ' +
+                                   ''.join('{} '.format(format_level) for format_level in log_levels.keys()))
+            rod_shaped_bac = basic_recording.getboolean('rod shaped bacteria')
+            if rod_shaped_bac:
+                min_size_ratio = adv_track.getfloat('rod average width/height ratio min.')
+                max_size_ratio = adv_track.getfloat('rod average width/height ratio max.')
             else:
-                logger.exception(max_vid_age_value_error)
+                min_size_ratio = adv_track.getfloat('coccoid average width/height ratio min.')
+                max_size_ratio = adv_track.getfloat('coccoid average width/height ratio max.')
+            colour_filter = adv_video.get('color filter')
+            if colour_filter != 'COLOR_BGR2GRAY':
+                colour_filter = set_different_colour_filter(colour_filter)
+            else:
+                colour_filter = cv2.COLOR_BGR2GRAY
+            max_vid_age = adv_video.get('maximal video file age (infinite or seconds)')
+            try:
+                max_vid_age = int(max_vid_age)
+            except ValueError as max_vid_age_value_error:
+                if max_vid_age.lower() in 'infinite':
+                    max_vid_age = np.inf
+                else:
+                    logger.exception(max_vid_age_value_error)
 
-        settings_dict = {
-            # _config['BASIC RECORDING SETTINGS']
-            'video extension': basic_recording.get('video extension'),
-            'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
-            'frames per second': basic_recording.getfloat('frames per second'),
-            'frame height': basic_recording.getint('frame height'),
-            'frame width': basic_recording.getint('frame width'),
-            'white bacteria on dark background': basic_recording.getboolean(
-                'white bacteria on dark background'),
-            'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),  # NEW
-            'threshold offset for detection': basic_recording.getint('threshold offset for detection'),
+            settings_dict = {
+                # _config['BASIC RECORDING SETTINGS']
+                'video extension': basic_recording.get('video extension'),
+                'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
+                'frames per second': basic_recording.getfloat('frames per second'),
+                'frame height': basic_recording.getint('frame height'),
+                'frame width': basic_recording.getint('frame width'),
+                'white bacteria on dark background': basic_recording.getboolean(
+                    'white bacteria on dark background'),
+                'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),  # NEW
+                'threshold offset for detection': basic_recording.getint('threshold offset for detection'),
 
-            # _config['BASIC TRACK DATA ANALYSIS SETTINGS']
-            'minimal length in seconds': basic_track.getfloat('minimal length in seconds'),
-            'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),  # __RENAMED__
-            'minimal angle in degrees for turning point': basic_track.getfloat(
-                'minimal angle in degrees for turning point'),  # __RENAMED__
-            'extreme area outliers lower end in px*px': basic_track.getint(
-                'extreme area outliers lower end in px*px'),
-            'extreme area outliers upper end in px*px': basic_track.getint(
-                'extreme area outliers upper end in px*px'),
+                # _config['BASIC TRACK DATA ANALYSIS SETTINGS']
+                'minimal length in seconds': basic_track.getfloat('minimal length in seconds'),
+                'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),  # __RENAMED__
+                'minimal angle in degrees for turning point': basic_track.getfloat(
+                    'minimal angle in degrees for turning point'),  # __RENAMED__
+                'extreme area outliers lower end in px*px': basic_track.getint(
+                    'extreme area outliers lower end in px*px'),
+                'extreme area outliers upper end in px*px': basic_track.getint(
+                    'extreme area outliers upper end in px*px'),
 
-            # _config['DISPLAY SETTINGS']
-            'user input': display.getboolean('user input'),
-            'select files': display.getboolean('select files'),
-            'display video analysis': display.getboolean('display video analysis'),  # __RENAMED__
-            'save video': display.getboolean('save video'),
+                # _config['DISPLAY SETTINGS']
+                'user input': display.getboolean('user input'),
+                'select files': display.getboolean('select files'),
+                'display video analysis': display.getboolean('display video analysis'),  # __RENAMED__
+                'save video': display.getboolean('save video'),
 
-            # _config['RESULTS SETTINGS']
-            'rename previous result .csv': results.getboolean('rename previous result .csv'),
-            'delete .csv file after analysis': results.getboolean('delete .csv file after analysis'),
-            'store processed .csv file': results.getboolean('store processed .csv file'),  # NEW
-            'store generated statistical .csv file': results.getboolean(
-                'store generated statistical .csv file'),  # NEW
-            'save large plots': results.getboolean('save large plots'),  # __RENAMED__
-            'save rose plot': results.getboolean('save rose plot'),  # NEW
-            'save time violin plot': results.getboolean('save time violin plot'),  # NEW
-            'save acr violin plot': results.getboolean('save acr violin plot'),  # NEW
-            'save length violin plot': results.getboolean('save length violin plot'),  # NEW
-            'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
-            'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
-            'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
-            'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
-            # @todo:  .get(# @todo)split selector / group split unit for violin plots
+                # _config['RESULTS SETTINGS']
+                'rename previous result .csv': results.getboolean('rename previous result .csv'),
+                'delete .csv file after analysis': results.getboolean('delete .csv file after analysis'),
+                'store processed .csv file': results.getboolean('store processed .csv file'),  # NEW
+                'store generated statistical .csv file': results.getboolean(
+                    'store generated statistical .csv file'),  # NEW
+                'save large plots': results.getboolean('save large plots'),  # __RENAMED__
+                'save rose plot': results.getboolean('save rose plot'),  # NEW
+                'save time violin plot': results.getboolean('save time violin plot'),  # NEW
+                'save acr violin plot': results.getboolean('save acr violin plot'),  # NEW
+                'save length violin plot': results.getboolean('save length violin plot'),  # NEW
+                'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
+                'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
+                'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
+                'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
+                # @todo:  .get(# @todo)split selector / group split unit for violin plots
 
-            # _config['LOGGING SETTINGS']
-            'log to file': log_settings.getboolean('log to file'),  # NEW
-            'log file path': log_settings.get('log file path'),
-            'shorten displayed logging output': log_settings.getboolean(
-                'shorten displayed logging output'),
-            'shorten logfile logging output': log_settings.getboolean(
-                'shorten logfile logging output'),  # NEW
-            'set logging level (debug/info/warning/critical)': set_log_level,
-            'log_level': set_log_level_setting,
-            'verbose': verbose,
+                # _config['LOGGING SETTINGS']
+                'log to file': log_settings.getboolean('log to file'),  # NEW
+                'log file path': log_settings.get('log file path'),
+                'shorten displayed logging output': log_settings.getboolean(
+                    'shorten displayed logging output'),
+                'shorten logfile logging output': log_settings.getboolean(
+                    'shorten logfile logging output'),  # NEW
+                'set logging level (debug/info/warning/critical)': set_log_level,
+                'log_level': set_log_level_setting,
+                'verbose': verbose,
 
-            # _config['ADVANCED VIDEO SETTINGS']
-            'use default extensions (.avi, .mp4, .mov)': adv_video.getboolean(
-                'use default extensions (.avi, .mp4, .mov)'),
-            'include luminosity in tracking calculation': adv_video.getboolean(
-                'include luminosity in tracking calculation'),
-            'color filter': colour_filter,
-            'maximal video file age (infinite or seconds)': max_vid_age,
-            'minimal video file age in seconds': adv_video.getint('minimal video file age in seconds'),
-            'minimal frame count': adv_video.getint('minimal frame count'),
-            'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),  # __RENAMED__
-            'list save length interval': adv_video.getint('list save length interval'),
+                # _config['ADVANCED VIDEO SETTINGS']
+                'use default extensions (.avi, .mp4, .mov)': adv_video.getboolean(
+                    'use default extensions (.avi, .mp4, .mov)'),
+                'include luminosity in tracking calculation': adv_video.getboolean(
+                    'include luminosity in tracking calculation'),
+                'color filter': colour_filter,
+                'maximal video file age (infinite or seconds)': max_vid_age,
+                'minimal video file age in seconds': adv_video.getint('minimal video file age in seconds'),
+                'minimal frame count': adv_video.getint('minimal frame count'),
+                'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),  # __RENAMED__
+                'list save length interval': adv_video.getint('list save length interval'),
 
-            # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
-            'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
-            'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %') / 100 + 1,
-            'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,  # 0 off
-            'try to omit motility outliers': adv_track.getboolean('try to omit motility outliers'),
-            'stop excluding motility outliers if total count above percent': adv_track.getfloat(
-                'stop excluding motility outliers if total count above percent') / 100,
-            'exclude measurement when above x times average area': adv_track.getfloat(
-                'exclude measurement when above x times average area'),
-            'average width/height ratio min.': min_size_ratio,
-            'average width/height ratio max.': max_size_ratio,
-            'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude') / 100,
-            'maximal recursion depth': adv_track.getint('maximal recursion depth'),  # 0 off
-            'limit track length exactly': adv_track.getboolean('limit track length exactly'),
-            'compare angle between n frames': adv_track.getint('compare angle between n frames'),
-            'force tracking.ini fps settings': adv_track.getboolean('force tracking.ini fps settings'),  # NEW
+                # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
+                'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
+                'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %') / 100 + 1,
+                'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,  # 0 off
+                'try to omit motility outliers': adv_track.getboolean('try to omit motility outliers'),
+                'stop excluding motility outliers if total count above percent': adv_track.getfloat(
+                    'stop excluding motility outliers if total count above percent') / 100,
+                'exclude measurement when above x times average area': adv_track.getfloat(
+                    'exclude measurement when above x times average area'),
+                'average width/height ratio min.': min_size_ratio,
+                'average width/height ratio max.': max_size_ratio,
+                'percent of screen edges to exclude': adv_track.getfloat('percent of screen edges to exclude') / 100,
+                'maximal recursion depth': adv_track.getint('maximal recursion depth'),  # 0 off
+                'limit track length exactly': adv_track.getboolean('limit track length exactly'),
+                'compare angle between n frames': adv_track.getint('compare angle between n frames'),
+                'force tracking.ini fps settings': adv_track.getboolean('force tracking.ini fps settings'),  # NEW
 
-            # _config['HOUSEKEEPING']
-            'last backup': housekeeping.get('last backup'),
-            'previous directory': housekeeping.get('previous directory', fallback='./'),
-            'shut down after analysis': housekeeping.getboolean('shut down after analysis'),
+                # _config['HOUSEKEEPING']
+                'last backup': housekeeping.get('last backup'),
+                'previous directory': housekeeping.get('previous directory', fallback='./'),
+                'shut down after analysis': housekeeping.getboolean('shut down after analysis'),
 
-            # _config['TEST SETTINGS']
-            'debugging': test.getboolean('debugging'),
-            'path to test video': test.get('path to test video'),
-            'path to test .csv': test.get('path to test .csv'),
-        }
-        if verbose:
-            logger.debug('tracking.ini settings:')
-        for test_key in settings_dict:
-            if settings_dict[test_key] is None:
-                error = 'tracking.ini is missing a value in {}'.format(test_key)
-                logger.critical(error)
-                settings_dict = None
-                break
-            elif verbose:
-                logger.debug('{}: {}'.format(test_key, settings_dict[test_key]))
-    except (TypeError, ValueError, KeyError) as ex:  # Exception
-        template = 'An exception of type {0} occurred while attempting to read tracking.ini. Arguments:\n{1!r}'
-        logger.exception(template.format(type(ex).__name__, ex.args))
-    finally:
-        pass
+                # _config['TEST SETTINGS']
+                'debugging': test.getboolean('debugging'),
+                'path to test video': test.get('path to test video'),
+                'path to test .csv': test.get('path to test .csv'),
+            }
+            if verbose:
+                logger.debug('tracking.ini settings:')
+            for test_key in settings_dict:
+                if settings_dict[test_key] is None:
+                    error = 'tracking.ini is missing a value in {}'.format(test_key)
+                    logger.critical(error)
+                    settings_dict = None
+                    break
+                elif verbose:
+                    logger.debug('{}: {}'.format(test_key, settings_dict[test_key]))
+        except (TypeError, ValueError, KeyError) as ex:  # Exception
+            template = 'An exception of type {0} occurred while attempting to read tracking.ini. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args))
+
     if not settings_dict:  # something went wrong, presumably missing/broken entries or sections
         create_configs()  # re-create tracking.ini
         return None
@@ -831,7 +831,6 @@ def get_data(csv_file_path, dtype=None):
 
 def log_infos(settings, format_for_logging=None):
     """Logging output for several options set in settings.
-
     :param settings: settings dict from get_configs()
     :type settings: dict
     :param format_for_logging: logging format string

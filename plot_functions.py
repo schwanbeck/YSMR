@@ -8,6 +8,16 @@ import matplotlib.pyplot as plt
 
 
 def angle_distribution_plot(df, bins_number, plot_title_name, save_path):
+    """
+    bins all angles and plots them on a circle
+    :param df: pandas data frame with angles
+    :param bins_number: count of bins
+    :type bins_number: int
+    :param plot_title_name: name of plot
+    :type plot_title_name: str
+    :param save_path: path to save image
+    :return: None
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     angle_radians = df['angle_diff']
     # Create array with average motility percentage per track
@@ -59,7 +69,15 @@ def angle_distribution_plot(df, bins_number, plot_title_name, save_path):
     plt.close()
 
 
-def save_large_plot(df, plot_title_name, track_count, save_path):
+def save_large_plot(df, plot_title_name, save_path):
+    """
+    save x/y-coordinates through time off all tracks on one plot
+    :param df: pandas data frame with x, y, time coordinates
+    :param plot_title_name: name of plot
+    :type plot_title_name: str
+    :param save_path: path to save image
+    :return: None
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
     plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
@@ -67,6 +85,7 @@ def save_large_plot(df, plot_title_name, track_count, save_path):
     plt.axis('equal')
     # display initial position as black dots
     grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y'].transform('first')
+    track_count = len(grouped_df)
     plt.scatter(
         grouped_df.POSITION_X,
         grouped_df.POSITION_Y,

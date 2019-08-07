@@ -51,7 +51,15 @@ from plot_functions import angle_distribution_plot, save_large_plot
 from tracker import CentroidTracker
 
 
-def track_bacteria(curr_path, settings=None, result_folder=None):
+def track_bacteria(video_path, settings=None, result_folder=None):
+    """
+    detect and track bright spots in a video file, saves output to a .csv file
+    :param video_path: path to video file
+    :param settings: settings from tracking.ini, will be read if not provided
+    :type settings: dict
+    :param result_folder: path to result folder
+    :return:
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     '''
     Used settings:
@@ -86,19 +94,19 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     # Log some general stuff
     logger.debug('Starting process - module: {} PID: {}'.format(__name__, os.getpid()))
     # Check for errors
-    if not os.path.isfile(curr_path):
-        logger.critical('File {} does not exist'.format(curr_path))
+    if not os.path.isfile(video_path):
+        logger.critical('File {} does not exist'.format(video_path))
         return None
     try:
-        cap = cv2.VideoCapture(curr_path)
+        cap = cv2.VideoCapture(video_path)
     except (IOError, OSError) as io_error:
-        logger.exception('Cannot open file {} due to error: {}'.format(curr_path, io_error))
+        logger.exception('Cannot open file {} due to error: {}'.format(video_path, io_error))
         return None
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if frame_count < settings['minimal frame count']:
         logger.warning('File {} too short; file was skipped. Limit for \'minimal frame count\': {}'.format(
-            curr_path, settings['minimal frame count']))
+            video_path, settings['minimal frame count']))
         return None
     try:  # @todo: force tracking.ini fps settings
         fps_of_file = cap.get(cv2.CAP_PROP_FPS)
@@ -106,7 +114,7 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
             logger.info('fps of file: {}'.format(fps_of_file))
     except Exception as ex:
         template = 'An exception of type {0} occurred while accessing fps from file {2}. Arguments:\n{1!r}'
-        logger.exception(template.format(type(ex).__name__, ex.args, curr_path))
+        logger.exception(template.format(type(ex).__name__, ex.args, video_path))
         if settings['frames per second'] <= 0:
             logger.critical('User defined fps unacceptable: type: {} value: {}'.format(
                 type(settings['frames per second']), settings['frames per second']))
@@ -116,11 +124,11 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     finally:
         pass
     if settings['save video'] and not result_folder:
-        result_folder = create_results_folder(curr_path)
+        result_folder = create_results_folder(video_path)
 
-    pathname, filename_ext = os.path.split(curr_path)
+    pathname, filename_ext = os.path.split(video_path)
     filename = os.path.splitext(filename_ext)[0]
-    logger.info('Starting with file {}'.format(curr_path))
+    logger.info('Starting with file {}'.format(video_path))
 
     # Set initial values; initialise result list
     old_list, list_name = save_list(file_path=pathname,
@@ -177,7 +185,7 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
             logger.info('Frames from file {} read.'.format(filename_ext))
             break
         elif not ret:  # Something must've happened, user decides if to proceed
-            logger.critical('Error during cap.read() with file {}'.format(curr_path))
+            logger.critical('Error during cap.read() with file {}'.format(video_path))
             error_during_read = settings['stop evaluation on error']
             break
 
@@ -338,7 +346,7 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
             cv2.imshow('{}'.format(filename_ext), frame)  # Display the image
             if cv2.waitKey(1) & 0xFF == ord('q'):  # Interrupt display on 'q'-keypress
                 error_during_read = True
-                logger.error('Processing file interrupted by user: {}'.format(curr_path))
+                logger.error('Processing file interrupted by user: {}'.format(video_path))
                 break
         # @todo: break_time_seconds from .ini - for partial analysis?
         # break_time_seconds = 0
@@ -378,7 +386,7 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     ))
 
     if error_during_read:
-        logger.critical('Error during read, stopping before evaluation. File: {}'.format(curr_path))
+        logger.critical('Error during read, stopping before evaluation. File: {}'.format(video_path))
         return None
     else:
         if True:  # settings['evaluate files after analysis']: @todo: change to combination check of plots/csv
@@ -409,8 +417,31 @@ def track_bacteria(curr_path, settings=None, result_folder=None):
     return list_name
 
 
-def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
+def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
                      frame_height, frame_width, settings, recursion=0):
+    """
+    checks multiple attributes for passed track, returns list with
+    ok start/stop indexes and lowest reached kick reason
+    :param df_passed: pandas data frame with tracks
+    :param start: start index of track
+    :type start: int
+    :param stop: stop index of track
+    :type stop: int
+    :param lower_boundary: low bacterial size boundary
+    :type lower_boundary: float
+    :param upper_boundary: high bacterial size boundary
+    :type upper_boundary: float
+    :param frame_height: height of frame
+    :type frame_height: int
+    :param frame_width: width of frame
+    :type frame_width: int
+    :param settings: tracking.ini settings
+    :type settings: dict
+    :param recursion: internal recursion level in case of split tracks
+    :return: list of (start, stop) indices that passed and lowest kick reason
+    :rtype return_result: list
+    :rtype kick_reason: int
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     size = stop - start + 1
     # avoid off-by-one error; used instead of df.shape[0] to avoid impossible calls to df.iloc[:]
@@ -512,8 +543,22 @@ def find_good_tracks(df_passed, lower_boundary, upper_boundary, start, stop,
     return return_result, kick_reason
 
 
-def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
+def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
                   frame_height=None, frame_width=None, settings=None):
+    """
+    selection of good tracks from file or data frame according to various parameters
+    either file or data frame have to be provided
+    :param path_to_file: optional path to .csv
+    :param df: optional pandas data frame
+    :param results_directory: path to results directory
+    :param fps: frame per second value
+    :type fps: float
+    :param frame_height: frame height
+    :param frame_width: frame width
+    :param settings: tracking.ini settings
+    :type settings: dict
+    :return: @todo define return
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     '''
     settings['verbose']
@@ -819,6 +864,18 @@ def select_tracks(path_to_file=None, results_directory=None, df=None, fps=None,
 
 
 def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps=None, ):
+    """
+    calculate additional info from provided .csv/data frame
+    :param path_to_file: .csv file
+    :param results_directory: path to results directory
+    :param df: optional pandas data frame
+    :param settings: tracking.ini settings
+    :type settings: dict
+    :param fps: frame per second value
+    :type fps: float
+    :return: string
+    :rtype: str
+    """
     logger = logging.getLogger('ei').getChild(__name__)
     settings = get_configs(settings)  # Get settings
     if settings is None:
