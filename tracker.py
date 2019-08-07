@@ -144,7 +144,7 @@ class CentroidTracker:
                     if row in used_rows or col in used_cols:
                         # continue jumps back to the beginning of the for-loop
                         continue
-                    # @todo: distance check? Currently kicked out in find_good_tracks()/like_a_record_baby.py
+                    # @todo: distance check? Currently kicked out in find_good_tracks()/track_eval.py
                     # @todo: could be done by setting distance_matrix values > max. travel dist. to NaN?
                     # otherwise, grab the object ID for the current row,
                     # set its new centroid, and reset the disappeared counter
