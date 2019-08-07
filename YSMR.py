@@ -51,7 +51,68 @@ if __name__ == '__main__':
         short_file_output=settings['shorten logfile logging output'],
         log_to_file=settings['log to file']
     )
+    # Log some general stuff
+    logger = logging.getLogger('ei').getChild(__name__)
+    explain_logger_setup = format_for_logging.format(**{
+        'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
+        'name': 'logger name',
+        'funcName': 'function name',
+        'filename': 'file name',
+        'lineno': 'lNr',
+        'levelname': 'level',
+        'process': 'PID',
+        'message': 'Message (lNr: line number, PID: Process ID)'
+    })
+    filler_for_logger = ''
+    for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
+        filler_for_logger += '#' * len(sub_string) + '\t'
+    filler_for_logger = filler_for_logger[:-1]  # remove last tab
+    logger.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
 
+    # Warnings
+    if settings['shut down after analysis']:
+        logger.warning('Shutting down PC after files have been processed')
+    if settings['debugging']:
+        logger.warning('Test settings enabled')
+    if not cv2.useOptimized():
+        logger.warning('Running cv2 unoptimised')
+    if not settings['rename previous result .csv']:
+        logger.warning('Old .csv result lists will be overwritten')
+    if settings['delete .csv file after analysis']:
+        logger.warning('Generated .csv files will be deleted after analysis')
+    if settings['select files']:
+        if not settings['debugging']:
+            logger.info('Manually selecting files enabled')
+        else:
+            logger.warning('Manually selecting files disabled due to test setting')
+    # Infos
+    if settings['verbose']:
+        logger.info('Verbose enabled, logging set to debug.')
+    else:
+        logger.info('Log level set to {}'.format(settings['set logging level (debug/info/warning/critical)']))
+    if settings['display video analysis']:
+        logger.info('Displaying videos')
+    if settings['save video']:
+        logger.info('Saving detection video files')
+    if settings['include luminosity in tracking calculation']:
+        logger.info('Use average luminosity for distance calculation enabled - '
+                    'processing time per video may increase notably')
+    if settings['limit track length to x seconds']:  # 0 is false; otherwise true
+        logger.info('Maximal track length for evaluation set to {} s'.format(
+            settings['limit track length to x seconds']))
+    else:
+        logger.info('Full track length will be used in evaluation')
+    if settings['maximal video file age (infinite or seconds)'] == np.inf:
+        logger.debug('maximal video file age (infinite or seconds) set to infinite')
+    else:
+        logger.debug('maximal video file age (infinite or seconds) set to {}'.format(
+            settings['maximal video file age (infinite or seconds)']))
+
+    # Debug messages
+    logger.debug('White bacteria on dark background set to {}'.format(
+        settings['white bacteria on dark background']))
+    logger.debug('List save length set to {} entries'.format(settings['list save length interval']))
+    logger.debug('Pixel/micrometre: {}'.format(settings['pixel per micrometre']))
 
     # if settings['result folder'] != 'None':
 
