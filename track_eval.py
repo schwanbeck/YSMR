@@ -14,6 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 details. You should have received a copy of the GNU General Public License along with YSMR. If
 not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 import multiprocessing as mp
 import os
@@ -47,7 +48,7 @@ from helper_file import (
     save_list,
     sort_list,
     save_df_to_csv)
-from plot_functions import angle_distribution_plot, save_large_plot
+from plot_functions import angle_distribution_plot, large_xy_plot, rose_graph
 from tracker import CentroidTracker
 
 
@@ -634,6 +635,9 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         if settings['verbose']:
             logger.debug('Handing string to get_data {}'.format(path_to_file))
         df = get_data(path_to_file)
+    # Rough check for unsorted df
+    if df.loc[:5, 'TRACK_ID'].is_monotonic:
+        df = sort_list(df=df, save_file=False)
     if df is None:  # get_data() returns None in case of errors
         logger.critical('Error reading data frame from file {}'.format(path_to_file))
         return None
@@ -897,6 +901,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     if df is None:  # get_data() returns None in case of errors
         logger.critical('Error reading data frame from file {}'.format(path_to_file))
         return None
+    # Rough check for unsorted df
+    if df.loc[:5, 'TRACK_ID'].is_monotonic:
+        df = sort_list(df=df, save_file=False)
     diff_tracks_start, track_change = different_tracks(df)
     px_to_micrometre = settings['pixel per micrometre']
     # @todo: allow user customisation of plot title name?
@@ -1134,11 +1141,16 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     plt.rcParams.update({'font.size': 8})
     plt.rcParams['axes.axisbelow'] = True
     if settings['save large plots']:
-        save_large_plot(df=df,
-                        plot_title_name=plot_title_name,
-                        track_count=len(track_change),
-                        save_path=save_path.format('_Bac_Run_Overview', '.png')
-                        )
+        large_xy_plot(df=df,
+                      plot_title_name=plot_title_name,
+                      save_path=save_path.format('Bac_Run_Overview', '.png')
+                      )
+    if settings['save rose plot']:
+        rose_graph(df=df,
+                   plot_title_name=plot_title_name,
+                   save_path=save_path.format('rose_graph', '.png'),
+                   dist_min=distance_min,
+                   dist_max=distance_max)
 
     f = plt.figure()
     # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
@@ -1313,48 +1325,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                                          # Set Textbox to relative position instead of absolute xy coordinates (0-1)
                                          transform=all_plots[plot_idx].transAxes,
                                          )
-            # Setting limit is done automatically anyway, doesn't change anything
-            # if plot_idx == 0:
-            #     all_plots[plot_idx].set_ylim(top=2.5, bottom=None, auto=True)
-            # Forsooth, this be a shite solution! @todo: plot min/max in .ini
-            # if plot_idx == 0:
-            #     all_plots[plot_idx].set_ylim([0, 1.5])
-            # elif plot_idx == 1:
-            #     all_plots[plot_idx].set_ylim([0, 350])
-            # if plot_idx == 2:
-            #     all_plots[plot_idx].set_ylim([0, 17.5])
-            # elif plot_idx == 3:
-            #     all_plots[plot_idx].set_ylim([0, 80])
-            # Create violin plot on current axis
-        # Manually rename x axis ticks on all subplots
-        # for axis in range(len(all_plots)):
-        #     all_plots[axis].set_xticklabels(['All', '0 - 25', '25 - 50', '50 - 75', '75 - 100'])
-    # tight_layout() clashes with plt.subplots(w, h, constrained_layout=True), which workes better anyway.
-    # plt.tight_layout()
-    bac_run_statistics_path = save_path.format('_Bac_Run_Statistics', '.png')
+
+    bac_run_statistics_path = save_path.format('Bac_Run_Statistics', '.png')
     plt.savefig(bac_run_statistics_path, dpi=300)
     logger.info('Statistics picture: {}'.format(bac_run_statistics_path))
     plt.close()
-    # slices = np.r_[slice(list_of_selected_plots[0][0], list_of_selected_plots[0][1] + 1),
-    #                slice(list_of_selected_plots[1][0], list_of_selected_plots[1][1] + 1),
-    #                slice(list_of_selected_plots[2][0], list_of_selected_plots[2][1] + 1),
-    #                slice(list_of_selected_plots[3][0], list_of_selected_plots[3][1] + 1),
-    #                slice(list_of_selected_plots[4][0], list_of_selected_plots[4][1] + 1),
-    #                slice(list_of_selected_plots[5][0], list_of_selected_plots[5][1] + 1)]
-    # with open('{}{}_df.csv'.format(results_directory, file_name), 'w+', newline='\n') as csv_file:
-    #     df.iloc[slices, :].to_csv(csv_file)
-    # if False:
-    #     df_single_plots = df.iloc[slices, :].copy()
-    #     sexy_single_plots_in_your_area(
-    #         df=df_single_plots,
-    #         # list_of_selected_plots=list_of_selected_plots,
-    #         px_to_micrometre=px_to_micrometre,
-    #         # period=period,
-    #         # avg_mask=avg_mask,
-    #         plot_name='{}{}_single_tracks.png'.format(results_directory, file_name),
-    #         fps=fps)
-    # else:
-    #     logger.info('No single tracks selected.')
+
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
     return end_string
@@ -1461,11 +1437,10 @@ if __name__ == '__main__':
         filler_for_logger += '#' * len(sub_string) + '\t'
     filler_for_logger = filler_for_logger[:-1]  # remove last tab
     logger_main.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
-    logger_main.debug('Logging test message')
 
     pool = mp.Pool()
-    main_files = find_paths(base_path='D:/Tracking_Test/',
-                            extension='list.csv', minimal_age=0)
+    main_files = find_paths(base_path='D:/Motility/190808/',
+                            extension='data.csv', minimal_age=0)
     if not main_files:
         logger_main.debug('No Paths provided.')
         queue_listener.stop()
@@ -1497,7 +1472,11 @@ if __name__ == '__main__':
 
     for d in main_files:
         # pool.apply_async(start_it_up, args=(d,))
-        start_it_up(path_to_files=d, create_logger=False, settings=settings_)
+        # start_it_up(path_to_files=d, create_logger=False, settings=settings_)
+        evaluate_tracks(path_to_file=d,
+                        results_directory=create_results_folder(os.path.dirname(d)),
+
+                        )
     pool.close()
     pool.join()
     logger_main.debug('Elapsed time: {}'.format(elapsed_time(t_one)))

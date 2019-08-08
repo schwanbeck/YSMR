@@ -14,16 +14,18 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 details. You should have received a copy of the GNU General Public License along with YSMR. If
 not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 
 import pandas as pd
 import numpy as np
+import seaborn as sns
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
 
-def angle_distribution_plot(df, bins_number, plot_title_name, save_path):
+def angle_distribution_plot(df, bins_number, plot_title_name, save_path, dpi=300):
     """
     bins all angles and plots them on a circle
     :param df: pandas data frame with angles
@@ -32,6 +34,8 @@ def angle_distribution_plot(df, bins_number, plot_title_name, save_path):
     :param plot_title_name: name of plot
     :type plot_title_name: str
     :param save_path: path to save image
+    :param dpi: dpi of saved image
+    :type dpi: int
     :return: None
     """
     logger = logging.getLogger('ei').getChild(__name__)
@@ -80,18 +84,20 @@ def angle_distribution_plot(df, bins_number, plot_title_name, save_path):
     for bar in bars:
         bar.set_alpha(0.5)
     plt.title('{} Data points: {}'.format(plot_title_name, angle_radians_minimum.sum()))
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path, dpi=dpi)
     logger.debug('Saving figure {}'.format(save_path))
     plt.close()
 
 
-def save_large_plot(df, plot_title_name, save_path):
+def large_xy_plot(df, plot_title_name, save_path, dpi=300):
     """
     save x/y-coordinates through time off all tracks on one plot
     :param df: pandas data frame with x, y, time coordinates
     :param plot_title_name: name of plot
     :type plot_title_name: str
     :param save_path: path to save image
+    :param dpi: dpi of saved image
+    :type dpi: int
     :return: None
     """
     logger = logging.getLogger('ei').getChild(__name__)
@@ -129,8 +135,128 @@ def save_large_plot(df, plot_title_name, save_path):
             lw=0,
         )
     plt.title('{} Track count: {}'.format(plot_title_name, track_count))
-    # save_path = '{}{}_Bac_Run_Overview.png'.format(results_directory, file_name)
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path, dpi=dpi)
+    logger.debug('Saving figure {}'.format(save_path))
+    plt.close()
+
+
+def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=300):
+    """
+    saves plot of all frames centered with initial x/y-coordinates set to 0,0
+    :param df: pandas data frame
+    :param plot_title_name: name of plot
+    :type plot_title_name: str
+    :param save_path: path to save image
+    :param dist_min: minimal distance travelled
+    :type dist_min: float
+    :param dist_max: maximal distance travelled
+    :type dist_max: float
+    :param dpi: dpi of saved image
+    :type dpi: int
+    :return: None
+    """
+    logger = logging.getLogger('ei').getChild(__name__)
+    if not dist_max:
+        try:
+            dist_max = df['travelled_dist'].max()
+        except KeyError:
+            dist_max = df['distance_colour'].max()
+    # set up figure
+    f = plt.figure()
+    f.set_size_inches(11.6929133858, 8.2677165354)
+
+    outer_space = 0.05
+    # inner_space = 0.03
+    head_space = 0.05
+    width_space = 0.05
+
+    # plt.rcParams.update({'font.size': 8})
+    plt.rcParams['axes.axisbelow'] = True
+
+    gs = gridspec.GridSpec(1, 100, figure=f)
+    gs.update(left=outer_space, right=1 - outer_space, hspace=head_space, wspace=width_space)
+
+    rose_plot = plt.subplot(gs[0, :-2])  # xy-centered plots
+    dist_bar = plt.subplot(gs[0, -2:])  # distance color-map
+    # get relevant columns, sort by distance (descending), then group sorted df by TRACK_ID
+    grouped_df = df.loc[
+                 :, ['TRACK_ID', 'distance_colour', 'x_norm', 'y_norm']
+                 ].sort_values(['distance_colour'], ascending=False).groupby(
+        'TRACK_ID', sort=False)['x_norm', 'y_norm', 'distance_colour']
+    # @todo: Circles indicate the mean and 90th percentile net displacements
+    for name, group in grouped_df:
+        rose_plot.scatter(
+            group.x_norm,
+            group.y_norm,
+            marker='.',
+            label=name,
+            c=plt.cm.gist_rainbow(group.distance_colour),
+            # vmin=distance_min,
+            # vmax=distance_max,
+            # cmap=plt.cm.gist_rainbow,
+            s=1,
+            lw=0,
+        )
+    rose_plot.set_aspect('equal')
+    rose_plot.grid(True)
+    rose_plot.set_title('{}'.format(plot_title_name, ))
+
+    # Distance colour indicator bar
+    colorbar_map = plt.cm.gist_rainbow
+    norm = mpl.colors.Normalize(vmin=dist_min, vmax=dist_max)
+    cb = mpl.colorbar.ColorbarBase(dist_bar, cmap=colorbar_map, norm=norm, )
+    cb.set_label('\u00B5m')
+    plt.savefig(save_path, dpi=dpi)
+    logger.debug('Saving figure {}'.format(save_path))
+    plt.close()
+
+
+def violin_plot(df, save_path, name_of_columns, category, cut_off_list, dpi=300):
+    return None
+    logger = logging.getLogger('ei').getChild(__name__)
+    fig = plt.figure()
+    fig.set_size_inches(11.6929133858, 8.2677165354)
+    ax = fig.add_subplot(111)
+    ax.grid(axis='y',
+            which='major',
+            # color='gray',
+            alpha=0.80, )
+
+    sns.violinplot(y=df[name_of_columns],
+                   x=df['Categories'],
+                   # hue=df_stats[name_of_columns[-1]],
+                   # dodge=False,
+                   orient='v',
+                   cut=0,
+                   ax=ax,
+                   scale='count',  # 'width' 'count' 'area'
+                   width=0.95,
+                   linewidth=1,
+                   bw=.2,
+                   # inner='stick',
+                   )
+    sns.despine(ax=ax, offset=0)
+    ax.set_title('\n\n')
+    text_boxes = []
+    for idx_textbox in range(len(cut_off_list)):
+        curr_category = cut_off_list[idx_textbox][2]
+        curr_entries = sum(df['Categories'] == curr_category)
+        df_subset = df.loc[df['Categories'] == curr_category, name_of_columns]
+        median = df_subset.median()
+        average = df_subset.mean()
+        if np.isnan(median):
+            continue
+
+    for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(text_boxes):
+        ax.text(idx_textbox / len(text_boxes) + 0.015, 1.005,
+                '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
+                    curr_category, curr_percentage,
+                    qm_plot,
+                    average_plot),
+                # Set Textbox to relative position instead of absolute xy coordinates (0-1
+                transform=ax.transAxes,
+                )
+    plt.savefig(save_path, dpi=dpi)
     logger.debug('Saving figure {}'.format(save_path))
     plt.close()
 
