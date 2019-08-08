@@ -101,7 +101,6 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
         logger.info('Collated results: {}'.format(os.path.abspath(file_path)))
     else:
         logger.info('Could not find paths.')
-    return
 
 
 def create_configs():
@@ -117,7 +116,7 @@ def create_configs():
     try:
         old_tracking_ini = '{}.{}'.format(configfilepath, datetime.now().strftime('%y%m%d%H%M%S'))
         os.rename(configfilepath, old_tracking_ini)
-        logger.critical('Old tracking.ini renamed to {}'.format(old_tracking_ini))
+        logger.warning('Old tracking.ini renamed to {}'.format(old_tracking_ini))
     except FileNotFoundError:
         pass
 
@@ -835,7 +834,8 @@ def log_infos(settings, format_for_logging=None):
     :type settings: dict
     :param format_for_logging: logging format string
     :type format_for_logging: str
-    :return: None
+    :return: filler for logger
+    :rtype: str
     """
     logger = logging.getLogger('ei').getChild(__name__)
     # Log some general stuff
@@ -907,6 +907,7 @@ def log_infos(settings, format_for_logging=None):
         settings['white bacteria on dark background']))
     logger.debug('List save length set to {} entries'.format(settings['list save length interval']))
     logger.debug('Pixel/micrometre: {}'.format(settings['pixel per micrometre']))
+    return filler_for_logger
 
 
 def logfile_padding(logfile, iteration=0):
@@ -1129,7 +1130,7 @@ def shift_np_array(arr, shift, fill_value=np.nan):
     return result
 
 
-def sort_list(file_path=None, sort=None, df=None, save_file=True):
+def sort_list(file_path=None, sort=None, df=None, save_file=False):
     """
     sorts pandas data frame, optionally saves it and loads it from csv
     :param file_path: file path to save .csv to
