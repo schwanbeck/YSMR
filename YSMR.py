@@ -14,6 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 details. You should have received a copy of the GNU General Public License along with YSMR. If
 not, see <http://www.gnu.org/licenses/>.
 """
+
 import logging
 import multiprocessing as mp
 import os
@@ -54,7 +55,7 @@ if __name__ == '__main__':
         log_to_file=settings['log to file']
     )
     logger = logging.getLogger('ei').getChild(__name__)
-    log_infos(settings=settings, format_for_logging=format_for_logging)
+    filler_for_logger = log_infos(settings=settings, format_for_logging=format_for_logging)
     # if settings['result folder'] != 'None':
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
