@@ -132,8 +132,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     logger.info('Starting with file {}'.format(video_path))
 
     # Set initial values; initialise result list
-    old_list, list_name = save_list(file_path=pathname,
-                                    filename=filename,
+    old_list, list_name = save_list(path=video_path,
                                     first_call=True,
                                     rename_old_list=settings['rename previous result .csv'],
                                     illumination=settings['include luminosity in tracking calculation'])
@@ -326,7 +325,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
             # shift this block into previous for-loop if too many objects per frame causes problems
             # change list_save_length in tracking.ini if current value is an issue.
             # send coords off to be saved on drive:
-            save_list(coords=coords, file_path=pathname, filename=filename,
+            save_list(coords=coords, path=list_name,
                       illumination=settings['include luminosity in tracking calculation'])
             coords = []  # reset coords list
 
@@ -357,7 +356,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         #     break
 
     if coords:  # check if list is not empty ([] == False, otherwise True)
-        save_list(coords=coords, file_path=pathname, filename=filename,
+        save_list(coords=coords, path=list_name,
                   illumination=settings['include luminosity in tracking calculation'])  # Save the remainder
 
     if settings['save video']:
@@ -389,33 +388,35 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     if error_during_read:
         logger.critical('Error during read, stopping before evaluation. File: {}'.format(video_path))
         return None
+    """
     else:
-        if True:  # settings['evaluate files after analysis']: @todo: change to combination check of plots/csv
-            logger.info('Starting evaluation of file {}'.format(list_name))
-            start_it_up(path_to_files=list_name,
-                        df=df_for_eval,
-                        fps=fps_of_file,
-                        frame_height=frame_height,
-                        frame_width=frame_width,
-                        settings=settings,
-                        create_logger=False,
-                        results_directory=result_folder,
-                        )
-        if settings['delete .csv file after analysis']:
-            logger.info('Removing .csv file: {}'.format(list_name))
-            try:
-                os.remove(list_name)
-            except (OSError, FileNotFoundError):
-                logger.warning('Could not delete file {}'.format(list_name))
-            finally:
-                pass
-        # If everything went well, hand over the list name to the next process
-        logger.info('Finished process - module: {} PID: {}, elapsed time: {}'.format(
-            __name__,
-            os.getpid(),
-            elapsed_time(t_one_track_bacteria))
+    if True:  # settings['evaluate files after analysis']: @todo: change to combination check of plots/csv
+        logger.info('Starting evaluation of file {}'.format(list_name))
+        start_it_up(path_to_files=list_name,
+                    df=df_for_eval,
+                    fps=fps_of_file,
+                    frame_height=frame_height,
+                    frame_width=frame_width,
+                    settings=settings,
+                    create_logger=False,
+                    results_directory=result_folder,
+                    )
+    if settings['delete .csv file after analysis']:
+        logger.info('Removing .csv file: {}'.format(list_name))
+        try:
+            os.remove(list_name)
+        except (OSError, FileNotFoundError):
+            logger.warning('Could not delete file {}'.format(list_name))
+        finally:
+            pass
+    # If everything went well, hand over the list name to the next process
+    logger.info('Finished process - module: {} PID: {}, elapsed time: {}'.format(
+        __name__,
+        os.getpid(),
+        elapsed_time(t_one_track_bacteria))
         )
-    return list_name
+    """
+    return df_for_eval, fps_of_file, frame_height, frame_width
 
 
 def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
@@ -635,9 +636,6 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         if settings['verbose']:
             logger.debug('Handing string to get_data {}'.format(path_to_file))
         df = get_data(path_to_file)
-    # Rough check for unsorted df
-    if df.loc[:5, 'TRACK_ID'].is_monotonic:
-        df = sort_list(df=df, save_file=False)
     if df is None:  # get_data() returns None in case of errors
         logger.critical('Error reading data frame from file {}'.format(path_to_file))
         return None
@@ -863,8 +861,14 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     #     df_passed_columns.extend(['WIDTH', 'HEIGHT', ])
     df = df.loc[df['good_track'] == 1, df_passed_columns]
     df.reset_index(inplace=True)
+    save_path = '{}{}'.format(results_directory, file_name) + '_{}{}'
+    if settings['store processed .csv file']:
+        save_df_to_csv(df=df, save_path=save_path.format('selected_data', '.csv'))
+    """
     return evaluate_tracks(path_to_file=path_to_file, results_directory=results_directory,
                            df=df, settings=settings, fps=fps)
+    """
+    return df
 
 
 def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps=None, ):
@@ -901,9 +905,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     if df is None:  # get_data() returns None in case of errors
         logger.critical('Error reading data frame from file {}'.format(path_to_file))
         return None
-    # Rough check for unsorted df
-    if df.loc[:5, 'TRACK_ID'].is_monotonic:
-        df = sort_list(df=df, save_file=False)
     diff_tracks_start, track_change = different_tracks(df)
     px_to_micrometre = settings['pixel per micrometre']
     # @todo: allow user customisation of plot title name?
@@ -912,13 +913,14 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     plot_title_name = plot_title_name.split(sep='.', maxsplit=1)[0]
     original_plot_date = plot_title_name[:12]
     # Add time/date to title of plot; convenience for illiterate supervisors
-    if original_plot_date.isdigit():
+    if original_plot_date.isdigit() and len(original_plot_date) == 12:
         plot_title_name = plot_title_name[12:]
         try:
             original_plot_date = strftime('%d. %m. \'%y, %H:%M:%S', strptime(str(original_plot_date), '%y%m%d%H%M%S'))
-        finally:
+            plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
+        except ValueError:
             pass
-        plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
+
     # @todo: sort plot_title_name out
     if len(plot_title_name) > 90:
         plot_title_name_len_half = int(0.5 * len(plot_title_name))
@@ -996,12 +998,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                                 df['angle_diff']
                                 ).astype(np.int32)
     df['turn_points'] = np.where((df['angle_diff'] > min_angle) & (df['minimum'] == 1), 1, 0).astype(np.uint8)
-
-    if settings['store processed .csv file']:
-        save_df_to_csv(df=df.loc[:,
-                       ['TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT',
-                        'travelled_dist', 'angle_diff', 'turn_points', ]],
-                       save_path=save_path.format('selected_data', '.csv'))
 
     df['x_norm'] = (df['POSITION_X'].sub(df.groupby('TRACK_ID')['POSITION_X'].transform('first'))) / px_to_micrometre
     df['y_norm'] = (df['POSITION_Y'].sub(df.groupby('TRACK_ID')['POSITION_Y'].transform('first'))) / px_to_micrometre

@@ -107,7 +107,6 @@ def large_xy_plot(df, plot_title_name, save_path, dpi=300):
     plt.axis('equal')
     # display initial position as black dots
     grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y'].transform('first')
-    track_count = len(grouped_df)
     plt.scatter(
         grouped_df.POSITION_X,
         grouped_df.POSITION_Y,
@@ -120,8 +119,9 @@ def large_xy_plot(df, plot_title_name, save_path, dpi=300):
     grouped_df = df.loc[:, ['TRACK_ID', 'distance_colour', 'POSITION_X', 'POSITION_Y', ]].sort_values(
         ['distance_colour'], ascending=False
     ).groupby('TRACK_ID', sort=False)['POSITION_X', 'POSITION_Y', 'distance_colour']
-
+    track_count = 0
     for name, group in grouped_df:
+        track_count += 1
         plt.scatter(
             group.POSITION_X,
             group.POSITION_Y,

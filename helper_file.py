@@ -700,6 +700,62 @@ def get_configs(tracking_ini_filepath=None):
     return settings_dict
 
 
+def get_data(csv_file_path, dtype=None):
+    """
+    load csv file to pandas data frame
+    :param csv_file_path: csv file to read
+    :param dtype: dict of columns to be loaded and their data types
+    :type dtype: dict
+    :return: pandas data frame
+    """
+    logger = logging.getLogger('ei').getChild(__name__)
+    if type(csv_file_path) is not (str or os.PathLike or bytes) and (list or tuple):
+        csv_file_path = csv_file_path[0]
+        logger.warning('Passed list or tuple argument to get_data(); get_data() only used first argument.')
+    try:
+        file_size = os.path.getsize(csv_file_path)
+        file_size = bytes_to_human_readable(file_size)
+        logger.info('Reading file with size {}: {} '.format(file_size, csv_file_path))
+    except (ValueError, TypeError) as size_error:
+        logger.exception('Have accepted file {}; error during size reading: {}'.format(csv_file_path, size_error))
+    finally:
+        pass
+    if dtype is None:
+        dtype = {'TRACK_ID': np.uint32,
+                 'POSITION_T': np.uint32,
+                 # up to ~4 * 10**9 data points; value must be pos.
+                 'POSITION_X': np.float64,
+                 'POSITION_Y': np.float64,
+                 'WIDTH': np.float64,
+                 'HEIGHT': np.float64,
+                 # 'DEGREES_ANGLE': np.float64
+                 }
+    use_cols = list(dtype.keys())
+    try:
+        # Fixes some special character problems with pd.read_csv paths:
+        with open(csv_file_path, 'r', newline='\n') as csv:
+            # csv_chunks =  # use chunks in case file is too large
+            # Done automatically by pd.read_csv()
+            df = pd.read_csv(csv,
+                             sep=',',  # as is default
+                             header=0,  # as is default
+                             usecols=use_cols,
+                             dtype=dtype,
+                             )
+    except ValueError as val_error:
+        logger.exception(val_error, '\n Error: Invalid file type: {}'.format(csv_file_path))
+        return None
+    except OSError as makedir_error:
+        logger.exception(makedir_error)
+        return None
+    # rough check if file is sorted
+    if all(x in use_cols for x in ['TRACK_ID', 'POSITION_T']):
+        if df.loc[:5, 'TRACK_ID'].is_monotonic:
+            df = sort_list(df=df, save_file=False)
+    logger.debug('Done reading {} into data frame'.format(csv_file_path))
+    return df
+
+
 def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                 short_stream_output=False, short_file_output=False, log_to_file=False):
     """
@@ -776,56 +832,83 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     return queue_listener, return_format
 
 
-def get_data(csv_file_path, dtype=None):
-    """
-    load csv file to pandas data frame
-    :param csv_file_path: csv file to read
-    :param dtype: dict of columns to be loaded and their data types
-    :type dtype: dict
-    :return: pandas data frame
-    """
+def get_video_paths(settings):
     logger = logging.getLogger('ei').getChild(__name__)
-    if type(csv_file_path) is not (str or os.PathLike or bytes) and (list or tuple):
-        csv_file_path = csv_file_path[0]
-        logger.warning('Passed list or tuple argument to get_data(); get_data() only used first argument.')
-    try:
-        file_size = os.path.getsize(csv_file_path)
-        file_size = bytes_to_human_readable(file_size)
-        logger.info('Reading file with size {}: {} '.format(file_size, csv_file_path))
-    except (ValueError, TypeError) as size_error:
-        logger.exception('Have accepted file {}; error during size reading: {}'.format(csv_file_path, size_error))
-    finally:
-        pass
-    if dtype is None:
-        dtype = {'TRACK_ID': np.uint32,
-                 'POSITION_T': np.uint32,
-                 # up to ~4 * 10**9 data points; value must be pos.
-                 'POSITION_X': np.float64,
-                 'POSITION_Y': np.float64,
-                 'WIDTH': np.float64,
-                 'HEIGHT': np.float64,
-                 # 'DEGREES_ANGLE': np.float64
-                 }
-    use_cols = list(dtype.keys())
-    try:
-        # Fixes some special character problems with pd.read_csv paths:
-        with open(csv_file_path, 'r', newline='\n') as csv:
-            # csv_chunks =  # use chunks in case file is too large
-            # Done automatically by pd.read_csv()
-            data = pd.read_csv(csv,
-                               sep=',',  # as is default
-                               header=0,  # as is default
-                               usecols=use_cols,
-                               dtype=dtype,
-                               )
-    except ValueError as val_error:
-        logger.exception(val_error, '\n Error: Invalid file type: {}'.format(csv_file_path))
+    folder_path = get_base_path(rename=True)
+    if folder_path is None:
         return None
-    except OSError as makedir_error:
-        logger.exception(makedir_error)
+    paths = []
+    if settings['use default extensions (.avi, .mp4, .mov)']:
+        extensions = ['.avi', '.mp4', '.mov']
+    else:
+        extensions = []
+    if settings['video extension'] not in extensions:
+        extensions.append(settings['video extension'])
+    ext_message = 'Looking for extensions ending in'
+    for ext in extensions:
+        ext_message += ' {},'.format(ext)
+    logger.info(ext_message[:-1])  # get rid of trailing comma
+    if not extensions:
+        exit_warning = 'No extensions provided / found, please check settings \'video extension\' ' \
+                       'and \'use default extensions (.avi, .mp4, .mov)\' in tracking.ini.\n'
+        logger.critical(exit_warning)
         return None
-    logger.debug('Done reading {} into data frame'.format(csv_file_path))
-    return data
+    for ext in extensions:
+        paths.extend(find_paths(base_path=folder_path,
+                                extension=ext,
+                                minimal_age=settings['minimal video file age in seconds'],
+                                maximal_age=settings['maximal video file age (infinite or seconds)'], ))
+    # Remove generated output files
+    paths = [path for path in paths if '_output.' not in path]
+    if not paths:  # Might as well stop, [] == False
+        logger.warning('No acceptable files found in {}\n'.format(folder_path))
+        return None
+    paths.sort()
+    return paths
+
+
+def get_any_paths(prev_dir=None, rename=False):
+    logger = logging.getLogger('ei').getChild(__name__)
+    if prev_dir is None:
+        try:
+            prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
+        except configparser.Error:
+            prev_dir = './'
+    filetypes = [
+        ('all files', '.*'),
+        ('csv', '.csv'),
+        ('avi', '.avi'),
+        ('mkv', '.mkv'),
+        ('mov', '.mov'),
+        ('mp4', '.mp4'),
+    ]
+    try:
+        root = Tk()
+        root.overrideredirect(1)  # hide the root window
+        root.withdraw()
+        # must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, -title, or -typevariable
+        paths = filedialog.askopenfilenames(
+            title='Choose files. ',
+            filetypes=filetypes,
+            defaultextension='.*',
+            multiple=True,
+            initialdir=prev_dir,
+        )
+    except Exception as ex:
+        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+        logger.exception(template.format(type(ex).__name__, ex.args))
+        return None
+    if len(paths) > 0:
+        curr_path = os.path.dirname(paths[0])
+        if rename:
+            try:
+                _config.set('HOUSEKEEPING', 'previous directory', curr_path)
+                with open('tracking.ini', 'w') as configfile:
+                    _config.write(configfile)
+                logger.debug('Previous directory set to {}'.format(curr_path))
+            finally:
+                pass
+    return paths
 
 
 def log_infos(settings, format_for_logging=None):
@@ -982,7 +1065,7 @@ def save_df_to_csv(df, save_path):
     logger = logging.getLogger('ei').getChild(__name__)
     try:
         old_df_path, old_df_ext = os.path.split(save_path)
-        old_csv = '{}{}.{}'.format(
+        old_csv = '{}/{}.{}'.format(
             old_df_path, datetime.now().strftime('%y%m%d%H%M%S'), old_df_ext
         )
         os.rename(save_path, old_csv)
@@ -1006,11 +1089,10 @@ def save_df_to_csv(df, save_path):
         pass
 
 
-def save_list(file_path, filename, coords=None, first_call=False, rename_old_list=True, illumination=False):
+def save_list(path, coords=None, first_call=False, rename_old_list=True, illumination=False):
     """
     Create csv file for results from track_bacteria(), append results
-    :param file_path: path to folder
-    :param filename: .csv file name
+    :param path: path to video file for first call, path to .csv file otherwise
     :param coords: list of coordinate tuples
     :type coords: list
     :param first_call: whether to create .csv with header
@@ -1022,20 +1104,32 @@ def save_list(file_path, filename, coords=None, first_call=False, rename_old_lis
     :return: first_call returns old_list string if it existed and .csv file path
     """
     logger = logging.getLogger('ei').getChild(__name__)
-    file_csv = '{}/{}_list.csv'.format(file_path, filename)
-
     if first_call:  # set up .csv file
+        pathname, filename_ext = os.path.split(path)
+        filename = os.path.splitext(filename_ext)[0]
+        file_csv = '{}/{}_list.csv'.format(pathname, filename)
+        now = datetime.now().strftime('%y%m%d%H%M%S')
         old_list = False
+        permission_error = False
         if os.path.isfile(file_csv):
             if rename_old_list:
-                now = datetime.now().strftime('%y%m%d%H%M%S')
                 old_filename, old_file_extension = os.path.splitext(file_csv)
                 old_list = '{}_{}{}'.format(old_filename, now, old_file_extension)
-                os.rename(file_csv, old_list)  # rename file
-                logger.info('Renaming old results to {}.'.format(old_list))
+                try:
+                    os.rename(file_csv, old_list)  # rename file
+                    logger.info('Renaming old results to {}.'.format(old_list))
+                except PermissionError:
+                    permission_error = True
             else:
-                logger.warning('Overwriting old results without saving: {}'.format(file_csv))
-                os.remove(file_csv)
+                try:
+                    os.remove(file_csv)
+                    logger.warning('Overwriting old results without saving: {}'.format(file_csv))
+                except PermissionError:
+                    permission_error = True
+        if permission_error:
+            old_list = file_csv
+            file_csv = '{}/{}_{}_list.csv'.format(pathname, now, filename)
+            logger.warning('Permission to change old csv denied, renamed new one to {}'.format(file_csv))
         with open(file_csv, 'w+', newline='') as file:
             if not illumination:
                 file.write('TRACK_ID,POSITION_T,POSITION_X,POSITION_Y,WIDTH,HEIGHT,DEGREES_ANGLE\n')  # first row
@@ -1068,7 +1162,7 @@ def save_list(file_path, filename, coords=None, first_call=False, rename_old_lis
             else:
                 curr_string = '{}\n'.format(curr_string)
             string_holder += curr_string  # append row
-        with open(file_csv, 'a', newline='') as file:  # append rows to .csv file
+        with open(path, 'a', newline='') as file:  # append rows to .csv file
             file.write(string_holder)
     return None, None
 
@@ -1160,14 +1254,7 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
         logger.exception(template.format(type(ex).__name__, ex.args, file_path))
         return None
     if save_file and file_path is not None:
-        try:
-            with open(file_path, 'w+', newline='\n') as csv:  # save again as csv
-                df.to_csv(csv, index=False)
-            logger.debug('Sorted results saved to: {}'.format(file_path))
-        except Exception as ex:
-            template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
-            logger.exception(template.format(type(ex).__name__, ex.args, file_path))
-            return None
+        save_df_to_csv(df=df, save_path=file_path)
     elif save_file and file_path is None:
         logger.critical('Cannot save file if no file path is provided.')
     return df
