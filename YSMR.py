@@ -22,22 +22,16 @@ import sys
 from datetime import datetime
 from time import sleep
 
-import cv2  # needs numpy
-import numpy as np  # needed by cv2; otherwise crashes/freezes without comment
-
 from helper_file import (
-    _backup,
+    # _backup,
     check_logfile,
     collate_results_csv_to_xlsx,
     create_results_folder,
     elapsed_time,
-    # find_paths,
-    # get_base_path,
     get_configs,
     get_loggers,
     log_infos,
     shutdown,
-    get_video_paths,
     get_any_paths
 )
 from track_eval import track_bacteria, select_tracks, evaluate_tracks
@@ -212,7 +206,7 @@ def ysmr():
         if settings['collate results csv to xlsx']:
             collate_results_csv_to_xlsx(path=folder_path, save_path=result_folder)
     # @todo: remove _backup later
-    _backup()
+    # _backup()
 
     if settings['shut down after analysis']:
         shutdown()

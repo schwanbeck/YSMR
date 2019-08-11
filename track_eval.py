@@ -16,30 +16,22 @@ not, see <http://www.gnu.org/licenses/>.
 """
 
 import logging
-import multiprocessing as mp
 import os
-import sys
 from datetime import datetime
 from time import strftime, localtime, strptime
 
 import cv2
-import matplotlib as mpl
-import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from scipy.signal import medfilt
 from scipy.spatial import distance as dist
-# from scipy import stats
 
 from helper_file import (
     _backup,
     # _mkdir,
     create_results_folder,
     different_tracks,
-    elapsed_time,
-    find_paths,
     # get_colour_map,
     get_configs,
     get_data,
@@ -47,8 +39,8 @@ from helper_file import (
     reshape_result,
     save_list,
     sort_list,
-    save_df_to_csv)
-from plot_functions import angle_distribution_plot, large_xy_plot, rose_graph
+    save_df_to_csv,)
+from plot_functions import angle_distribution_plot, large_xy_plot, rose_graph, violin_plot
 from tracker import CentroidTracker
 
 
@@ -983,7 +975,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df['angle_diff'] = np.arctan2(x_diff_track_for_angle, y_diff_track_for_angle)  # rad
 
     # Angle distribution histogram
-    if settings['save angle distribution plot / bins']:
+    if settings['save angle distribution plot / bins']:  # 0 == False
         # takes angle_diff as rad
         angle_distribution_plot(df=df,
                                 bins_number=settings['save angle distribution plot / bins'],
@@ -1097,7 +1089,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     df_stats['Categories'] = name_all_categories
     df_stats_seaborne = df_stats.copy()
-    cut_off_parameter = name_of_columns[0]  # 'Turn Points (TP/s)',  # 0
+    cut_off_parameter = name_of_columns[5]  # 'Turn Points (TP/s)',  # 0
 
     # To drop unassigned values later
     df_stats_seaborne['Categories'] = np.NaN
@@ -1147,333 +1139,323 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                    save_path=save_path.format('rose_graph', '.png'),
                    dist_min=distance_min,
                    dist_max=distance_max)
-
-    f = plt.figure()
-    # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
-    f.set_size_inches(11.6929133858, 8.2677165354)
-    # @todo: set plot values in .ini?
-    outer_space = 0.05
-    inner_space = 0.03
-    head_space = 0.3
-    width_space = 0.05
-    gs1 = gridspec.GridSpec(2, 1, figure=f)
-    gs1.update(left=outer_space, right=0.5 - inner_space, hspace=head_space, wspace=width_space)
-    gs2 = gridspec.GridSpec(2, 100, figure=f)
-    gs2.update(left=0.5 + inner_space, right=1 - outer_space, hspace=head_space, wspace=width_space)
-
-    all_plots = [
-        plt.subplot(gs1[0, 0]),  # TPs
-        plt.subplot(gs2[0, :-2]),  # xy-centered plots
-        plt.subplot(gs1[1, 0]),  # Speed
-        plt.subplot(gs2[1, :]),  # time
-        plt.subplot(gs2[0, -2:]),  # distance color-map
-    ]
-
-    ##############################
-    if settings['verbose']:
-        logger.debug('Setting up plots')
-    # So we get a distance range from 0 to 1 for later color selection
-    textbox = False
-    for plot_idx in range(0, len(all_plots), 1):
-        if settings['verbose']:
-            logger.debug('Plot {} / {}'.format(plot_idx + 1, len(all_plots)))  # in case plotting takes forever
-        if plot_idx == 1:  # 0,0 centered plot of all tracks
-            all_plots[plot_idx].set_title('{}\nTracks: {}, Prediction: {}'.format(
-                plot_title_name, len(diff_tracks_start), prediction))
-
-            # get relevant columns, sort by distance (descending), then group sorted df by TRACK_ID
-            grouped_df = df.loc[
-                         :, ['TRACK_ID', 'distance_colour', 'x_norm', 'y_norm']
-                         ].sort_values(['distance_colour'], ascending=False).groupby(
-                'TRACK_ID', sort=False)['x_norm', 'y_norm', 'distance_colour']
-            # @todo: Circles indicate the mean and 90th percentile net displacements
-            for name, group in grouped_df:
-                all_plots[plot_idx].scatter(
-                    group.x_norm,
-                    group.y_norm,
-                    marker='.',
-                    label=name,
-                    c=plt.cm.gist_rainbow(group.distance_colour),
-                    # vmin=distance_min,
-                    # vmax=distance_max,
-                    # cmap=plt.cm.gist_rainbow,
-                    s=1,
-                    lw=0,
-                )
-            del grouped_df
-            all_plots[plot_idx].set_aspect('equal', adjustable='box')
-            all_plots[plot_idx].grid(True)
-
-        elif plot_idx == 4:
-            colorbar_map = plt.cm.gist_rainbow
-            norm = mpl.colors.Normalize(vmin=distance_min, vmax=distance_max)
-            cb = mpl.colorbar.ColorbarBase(all_plots[plot_idx], cmap=colorbar_map, norm=norm, )
-            cb.set_label('Distance in \u00B5m')
-
-        elif plot_idx == 3:
-            all_plots[plot_idx].grid(axis='y', which='major',
-                                     # color='gray',
-                                     alpha=0.80, )
-            sns.violinplot(y=df_stats_seaborne[name_of_columns[5]],
-                           x=df_stats_seaborne['Categories'],
-                           # hue=df_stats[name_of_columns[-1]],
-                           # dodge=False,
-                           orient='v',
-                           cut=0,
-                           ax=all_plots[plot_idx],
-                           scale='count',  # 'width' 'count' 'area'
-                           width=0.95,
-                           linewidth=1,
-                           bw=.2,
-                           # inner='stick',
-                           )
-            # Remove top and right border
-            sns.despine(ax=all_plots[plot_idx], offset=0)
-
-            # Empty title so there's 2 lines of space for the text boxes
-            all_plots[plot_idx].set_title('\n\n')
-            textbox_info = []
-            for idx_textbox in range(len(cut_off_list)):
-                # Select name of current violin plot x axis
-                curr_category = cut_off_list[idx_textbox][2]
-                # Select current of current column the subset of current x axis, calculate median and mean
-                curr_entries = sum(df_stats_seaborne['Categories'] == curr_category)
-                # logger.info('Category: {} Counts: {}'.format(curr_category, curr_entries))
-                df_stats_subset = df_stats_seaborne.loc[df_stats_seaborne['Categories'] == curr_category,
-                                                        name_of_columns[5]]
-                # Calculate median and average of current violin plot
-                qm_plot = df_stats_subset.median()
-                average_plot = df_stats_subset.mean()
-                if np.isnan(qm_plot):
-                    continue
-                if all_entries > 0:
-                    curr_percentage = curr_entries / all_entries
-                else:
-                    curr_percentage = 'error'
-                textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))
-
-            for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(textbox_info):
-                all_plots[plot_idx].text(idx_textbox / len(textbox_info) + 0.015, 1.005,
-                                         '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
-                                             curr_category, curr_percentage,
-                                             qm_plot,
-                                             average_plot),
-                                         # Set Textbox to relative position instead of absolute xy coordinates (0-1)
-                                         transform=all_plots[plot_idx].transAxes,
-                                         )
-
-        else:  # statistical plot
-            textbox = True
-            all_plots[plot_idx].grid(axis='y', which='major',
-                                     # color='gray',
-                                     alpha=0.80, )
-
-            sns.violinplot(y=df_stats_seaborne[name_of_columns[plot_idx]],
-                           x=df_stats_seaborne['Categories'],
-                           # hue=df_stats[name_of_columns[-1]],
-                           # dodge=False,
-                           orient='v',
-                           cut=0,
-                           ax=all_plots[plot_idx],
-                           scale='count',  # 'width' 'count' 'area'
-                           width=0.95,
-                           linewidth=1,
-                           bw=.2,
-                           # inner='stick',
-                           )
-            # Remove top and right border
-            sns.despine(ax=all_plots[plot_idx], offset=0)
-
-            # Empty title so there's 2 lines of space for the text boxes
-            all_plots[plot_idx].set_title('\n\n')
-
-            # Create description (title) for each violin plot
-        if textbox:
-            textbox = False
-            # for idx_textbox in range(text_box_count):
-            #   (curr_category, curr_percentage, qm_plot, average_plot
-            textbox_info = []
-            for idx_textbox in range(len(cut_off_list)):
-                # Select name of current violin plot x axis
-                curr_category = cut_off_list[idx_textbox][2]
-                # Select current of current column the subset of current x axis, calculate median and mean
-                curr_entries = sum(df_stats_seaborne['Categories'] == curr_category)
-                # logger.info('Category: {} Counts: {}'.format(curr_category, curr_entries))
-                df_stats_subset = df_stats_seaborne.loc[df_stats_seaborne['Categories'] == curr_category,
-                                                        name_of_columns[plot_idx]]
-                # Calculate median and average of current violin plot
-                qm_plot = df_stats_subset.median()
-                average_plot = df_stats_subset.mean()
-                if np.isnan(qm_plot):
-                    continue
-                if all_entries > 0:
-                    curr_percentage = curr_entries / all_entries
-                else:
-                    curr_percentage = 'error'
-                textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))
-
-            for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(textbox_info):
-                all_plots[plot_idx].text(idx_textbox / len(textbox_info) + 0.015, 1.005,
-                                         '{}: {:.1%}\nMedian: {:.2f}\nAverage:  {:.2f}'.format(
-                                             curr_category, curr_percentage,
-                                             qm_plot,
-                                             average_plot),
-                                         # Set Textbox to relative position instead of absolute xy coordinates (0-1)
-                                         transform=all_plots[plot_idx].transAxes,
-                                         )
-
-    bac_run_statistics_path = save_path.format('Bac_Run_Statistics', '.png')
-    plt.savefig(bac_run_statistics_path, dpi=300)
-    logger.info('Statistics picture: {}'.format(bac_run_statistics_path))
-    plt.close()
-
+    for name in name_of_columns:
+        violin_plot(
+            df=df_stats_seaborne,
+            save_path=save_path.format(name[:5], '.png'),
+            category=name,
+            cut_off_list=cut_off_list,
+        )
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
     return end_string
 
+    # f = plt.figure()
+    # # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
+    # f.set_size_inches(11.6929133858, 8.2677165354)
+    # # @todo: set plot values in .ini?
+    # outer_space = 0.05
+    # inner_space = 0.03
+    # head_space = 0.3
+    # width_space = 0.05
+    # gs1 = gridspec.GridSpec(2, 1, figure=f)
+    # gs1.update(left=outer_space, right=0.5 - inner_space, hspace=head_space, wspace=width_space)
+    # gs2 = gridspec.GridSpec(2, 100, figure=f)
+    # gs2.update(left=0.5 + inner_space, right=1 - outer_space, hspace=head_space, wspace=width_space)
+    #
+    # all_plots = [
+    #     plt.subplot(gs1[0, 0]),  # TPs
+    #     plt.subplot(gs2[0, :-2]),  # xy-centered plots
+    #     plt.subplot(gs1[1, 0]),  # Speed
+    #     plt.subplot(gs2[1, :]),  # time
+    #     plt.subplot(gs2[0, -2:]),  # distance color-map
+    # ]
+    #
+    # ##############################
+    # if settings['verbose']:
+    #     logger.debug('Setting up plots')
+    # # So we get a distance range from 0 to 1 for later color selection
+    # textbox = False
+    # for plot_idx in range(0, len(all_plots), 1):
+    #     if settings['verbose']:
+    #         logger.debug('Plot {} / {}'.format(plot_idx + 1, len(all_plots)))  # in case plotting takes forever
+    #     if plot_idx == 1:  # 0,0 centered plot of all tracks
+    #         all_plots[plot_idx].set_title('{}\nTracks: {}, Prediction: {}'.format(
+    #             plot_title_name, len(diff_tracks_start), prediction))
+    #
+    #         # get relevant columns, sort by distance (descending), then group sorted df by TRACK_ID
+    #         grouped_df = df.loc[
+    #                      :, ['TRACK_ID', 'distance_colour', 'x_norm', 'y_norm']
+    #                      ].sort_values(['distance_colour'], ascending=False).groupby(
+    #             'TRACK_ID', sort=False)['x_norm', 'y_norm', 'distance_colour']
+    #         # @todo: Circles indicate the mean and 90th percentile net displacements
+    #         for name, group in grouped_df:
+    #             all_plots[plot_idx].scatter(
+    #                 group.x_norm,
+    #                 group.y_norm,
+    #                 marker='.',
+    #                 label=name,
+    #                 c=plt.cm.gist_rainbow(group.distance_colour),
+    #                 # vmin=distance_min,
+    #                 # vmax=distance_max,
+    #                 # cmap=plt.cm.gist_rainbow,
+    #                 s=1,
+    #                 lw=0,
+    #             )
+    #         del grouped_df
+    #         all_plots[plot_idx].set_aspect('equal', adjustable='box')
+    #         all_plots[plot_idx].grid(True)
+    #
+    #     elif plot_idx == 4:
+    #         colorbar_map = plt.cm.gist_rainbow
+    #         norm = mpl.colors.Normalize(vmin=distance_min, vmax=distance_max)
+    #         cb = mpl.colorbar.ColorbarBase(all_plots[plot_idx], cmap=colorbar_map, norm=norm, )
+    #         cb.set_label('Distance in \u00B5m')
+    #
+    #     elif plot_idx == 3:
+    #         all_plots[plot_idx].grid(axis='y', which='major',
+    #                                  # color='gray',
+    #                                  alpha=0.80, )
+    #         sns.violinplot(y=df_stats_seaborne[name_of_columns[5]],
+    #                        x=df_stats_seaborne['Categories'],
+    #                        # hue=df_stats[name_of_columns[-1]],
+    #                        # dodge=False,
+    #                        orient='v',
+    #                        cut=0,
+    #                        ax=all_plots[plot_idx],
+    #                        scale='count',  # 'width' 'count' 'area'
+    #                        width=0.95,
+    #                        linewidth=1,
+    #                        bw=.2,
+    #                        # inner='stick',
+    #                        )
+    #         # Remove top and right border
+    #         sns.despine(ax=all_plots[plot_idx], offset=0)
+    #
+    #         # Empty title so there's 2 lines of space for the text boxes
+    #         all_plots[plot_idx].set_title('\n\n')
+    #         textbox_info = []
+    #         for idx_textbox in range(len(cut_off_list)):
+    #             # Select name of current violin plot x axis
+    #             curr_category = cut_off_list[idx_textbox][2]
+    #             # Select current of current column the subset of current x axis, calculate median and mean
+    #             curr_entries = sum(df_stats_seaborne['Categories'] == curr_category)
+    #             # logger.info('Category: {} Counts: {}'.format(curr_category, curr_entries))
+    #             df_stats_subset = df_stats_seaborne.loc[df_stats_seaborne['Categories'] == curr_category,
+    #                                                     name_of_columns[5]]
+    #             # Calculate median and average of current violin plot
+    #             qm_plot = df_stats_subset.median()
+    #             average_plot = df_stats_subset.mean()
+    #             if np.isnan(qm_plot):
+    #                 continue
+    #             if all_entries > 0:
+    #                 curr_percentage = curr_entries / all_entries
+    #             else:
+    #                 curr_percentage = 'error'
+    #             textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))
+    #
+    #         for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(textbox_info):
+    #             all_plots[plot_idx].text(idx_textbox / len(textbox_info) + 0.015, 1.005,
+    #                                      '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
+    #                                          curr_category, curr_percentage,
+    #                                          qm_plot,
+    #                                          average_plot),
+    #                                      # Set Textbox to relative position instead of absolute xy coordinates (0-1)
+    #                                      transform=all_plots[plot_idx].transAxes,
+    #                                      )
+    #
+    #     else:  # statistical plot
+    #         textbox = True
+    #         all_plots[plot_idx].grid(axis='y', which='major',
+    #                                  # color='gray',
+    #                                  alpha=0.80, )
+    #
+    #         sns.violinplot(y=df_stats_seaborne[name_of_columns[plot_idx]],
+    #                        x=df_stats_seaborne['Categories'],
+    #                        # hue=df_stats[name_of_columns[-1]],
+    #                        # dodge=False,
+    #                        orient='v',
+    #                        cut=0,
+    #                        ax=all_plots[plot_idx],
+    #                        scale='count',  # 'width' 'count' 'area'
+    #                        width=0.95,
+    #                        linewidth=1,
+    #                        bw=.2,
+    #                        # inner='stick',
+    #                        )
+    #         # Remove top and right border
+    #         sns.despine(ax=all_plots[plot_idx], offset=0)
+    #
+    #         # Empty title so there's 2 lines of space for the text boxes
+    #         all_plots[plot_idx].set_title('\n\n')
+    #
+    #         # Create description (title) for each violin plot
+    #     if textbox:
+    #         textbox = False
+    #         # for idx_textbox in range(text_box_count):
+    #         #   (curr_category, curr_percentage, qm_plot, average_plot
+    #         textbox_info = []
+    #         for idx_textbox in range(len(cut_off_list)):
+    #             # Select name of current violin plot x axis
+    #             curr_category = cut_off_list[idx_textbox][2]
+    #             # Select current of current column the subset of current x axis, calculate median and mean
+    #             curr_entries = sum(df_stats_seaborne['Categories'] == curr_category)
+    #             # logger.info('Category: {} Counts: {}'.format(curr_category, curr_entries))
+    #             df_stats_subset = df_stats_seaborne.loc[df_stats_seaborne['Categories'] == curr_category,
+    #                                                     name_of_columns[plot_idx]]
+    #             # Calculate median and average of current violin plot
+    #             qm_plot = df_stats_subset.median()
+    #             average_plot = df_stats_subset.mean()
+    #             if np.isnan(qm_plot):
+    #                 continue
+    #             if all_entries > 0:
+    #                 curr_percentage = curr_entries / all_entries
+    #             else:
+    #                 curr_percentage = 'error'
+    #             textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))
 
-# @todo: create ysmr()
-def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None,
-                results_directory=None, settings=None, create_logger=True, ):
-    logger = logging.getLogger('ei').getChild(__name__)
-    '''
-    settings['log_level']
-    settings['log file path']
-    settings['shorten displayed logging output']
-    settings['shorten logfile logging output']
-    settings['log to file']
-    '''
-    settings = get_configs(settings)  # Get settings
-    if settings is None:
-        logger.critical('No settings provided / could not get settings for start_it_up().')
-        return None
-    if create_logger:
-        get_loggers(log_level=settings['log_level'],
-                    logfile_name=settings['log file path'],
-                    short_stream_output=settings['shorten displayed logging output'],
-                    short_file_output=settings['shorten logfile logging output'],
-                    log_to_file=settings['log to file'], )
-    end_string = None
-    if results_directory is None:
-        results_directory = create_results_folder(path=path_to_files)
-    # Check type of path_to_files
-    if isinstance(path_to_files, str) or isinstance(path_to_files, os.PathLike):
-        # Skip list read via get_data() if we have a data frame:
-        if type(df) is pd.core.frame.DataFrame:
-            logger.debug('Passing data frame to select_tracks(): {}'.format(path_to_files))
-            end_string = select_tracks(path_to_file=path_to_files,
-                                       results_directory=results_directory,
-                                       df=df,
-                                       fps=fps,
-                                       frame_height=frame_height,
-                                       frame_width=frame_width,
-                                       settings=settings)
-        # Proceed normally otherwise:
-        elif os.path.isfile(path_to_files):
-            logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
-            end_string = select_tracks(path_to_file=path_to_files,
-                                       results_directory=results_directory,
-                                       fps=fps,
-                                       frame_height=frame_height,
-                                       frame_width=frame_width,
-                                       settings=settings)
-        else:
-            logger.warning('File {} was skipped during evaluation, '
-                           'file did not exist or could not be accessed. '.format(path_to_files))
-    # If we got an iterable, go through each entry:
-    elif isinstance(path_to_files, list) or isinstance(path_to_files, tuple):
-        end_string = []
-        for curr_path_to_file in path_to_files:
-            if os.path.isfile(curr_path_to_file):
-                logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
-                end_string.append(select_tracks(path_to_file=path_to_files,
-                                                results_directory=results_directory,
-                                                fps=fps,
-                                                frame_height=frame_height,
-                                                frame_width=frame_width,
-                                                settings=settings))
-            else:
-                logger.warning('File {} was skipped during evaluation, '
-                               'file did not exist or could not be accessed. '.format(curr_path_to_file))
-    else:
-        end_string = 'Passed wrong argument(s) to start_it_up(): {}, ' \
-                     'should be string/path or list of strings/paths. Argument: ' \
-                     '{}'.format(type(path_to_files), path_to_files)
-        logger.critical(end_string)
-    return end_string
 
-
-if __name__ == '__main__':
-    t_one = datetime.now()  # to get rough time estimation
-    # Log message setup
-    settings_ = get_configs()  # Get settings
-    if settings_ is None:
-        sys.exit('Fatal error in retrieving tracking.ini')
-    _backup()
-    queue_listener, format_for_logging = get_loggers(
-        log_level=settings_['log_level'],
-        logfile_name=settings_['log file path'],
-        short_stream_output=settings_['shorten displayed logging output'],
-        short_file_output=settings_['shorten logfile logging output'],
-        log_to_file=settings_['log to file'],
-    )
-    # Log some general stuff
-    logger_main = logging.getLogger('ei').getChild(__name__)
-    explain_logger_setup = format_for_logging.format(**{
-        'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
-        'name': 'logger name',
-        'funcName': 'function name',
-        'lineno': 'lNr',
-        'levelname': 'level',
-        'process': 'PID',
-        'message': 'Message (lNr: line number, PID: Process ID)'
-    })
-    filler_for_logger = ''  # Stupid tabs
-    for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
-        filler_for_logger += '#' * len(sub_string) + '\t'
-    filler_for_logger = filler_for_logger[:-1]  # remove last tab
-    logger_main.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
-
-    pool = mp.Pool()
-    main_files = find_paths(base_path='D:/Motility/190808/',
-                            extension='data.csv', minimal_age=0)
-    if not main_files:
-        logger_main.debug('No Paths provided.')
-        queue_listener.stop()
-        sys.exit()
-    for file in main_files:
-        logger_main.debug('{}'.format(file))
-    main_folder_time = str(strftime('%y%m%d', localtime()))
-    main_dir_form = '{}/{}_Results/'
-    if isinstance(main_files, str) or isinstance(main_files, os.PathLike):
-        main_daily_directory = main_dir_form.format(os.path.dirname(main_files), main_folder_time)
-    elif isinstance(main_files, list) or isinstance(main_files, tuple):
-        main_daily_directory = main_dir_form.format(os.path.dirname(main_files[0]), main_folder_time)
-    else:
-        logger_main.critical('Could not access base path in path to files; '
-                             'results folder set to {}'.format(os.path.abspath('./')))
-        main_daily_directory = main_dir_form.format('.', main_folder_time)
-    if not os.path.exists(main_daily_directory):
-        try:
-            os.makedirs(main_daily_directory)
-            logger_main.info('Results folder: {}'.format(main_daily_directory))
-        except OSError as mkdir_error:
-            logger_main.exception(mkdir_error)
-            logger_main.warning('Unable to create {}, directory changed to {}'.format(
-                main_daily_directory, os.path.abspath('./')))
-            main_daily_directory = './'
-        finally:
-            pass
-    logger_main.info('Paths: {}'.format(len(main_files)))
-
-    for d in main_files:
-        # pool.apply_async(start_it_up, args=(d,))
-        # start_it_up(path_to_files=d, create_logger=False, settings=settings_)
-        evaluate_tracks(path_to_file=d,
-                        results_directory=create_results_folder(os.path.dirname(d)),
-
-                        )
-    pool.close()
-    pool.join()
-    logger_main.debug('Elapsed time: {}'.format(elapsed_time(t_one)))
-    queue_listener.stop()
+# def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None,
+#                 results_directory=None, settings=None, create_logger=True, ):
+#     logger = logging.getLogger('ei').getChild(__name__)
+#     '''
+#     settings['log_level']
+#     settings['log file path']
+#     settings['shorten displayed logging output']
+#     settings['shorten logfile logging output']
+#     settings['log to file']
+#     '''
+#     settings = get_configs(settings)  # Get settings
+#     if settings is None:
+#         logger.critical('No settings provided / could not get settings for start_it_up().')
+#         return None
+#     if create_logger:
+#         get_loggers(log_level=settings['log_level'],
+#                     logfile_name=settings['log file path'],
+#                     short_stream_output=settings['shorten displayed logging output'],
+#                     short_file_output=settings['shorten logfile logging output'],
+#                     log_to_file=settings['log to file'], )
+#     end_string = None
+#     if results_directory is None:
+#         results_directory = create_results_folder(path=path_to_files)
+#     # Check type of path_to_files
+#     if isinstance(path_to_files, str) or isinstance(path_to_files, os.PathLike):
+#         # Skip list read via get_data() if we have a data frame:
+#         if type(df) is pd.core.frame.DataFrame:
+#             logger.debug('Passing data frame to select_tracks(): {}'.format(path_to_files))
+#             end_string = select_tracks(path_to_file=path_to_files,
+#                                        results_directory=results_directory,
+#                                        df=df,
+#                                        fps=fps,
+#                                        frame_height=frame_height,
+#                                        frame_width=frame_width,
+#                                        settings=settings)
+#         # Proceed normally otherwise:
+#         elif os.path.isfile(path_to_files):
+#             logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
+#             end_string = select_tracks(path_to_file=path_to_files,
+#                                        results_directory=results_directory,
+#                                        fps=fps,
+#                                        frame_height=frame_height,
+#                                        frame_width=frame_width,
+#                                        settings=settings)
+#         else:
+#             logger.warning('File {} was skipped during evaluation, '
+#                            'file did not exist or could not be accessed. '.format(path_to_files))
+#     # If we got an iterable, go through each entry:
+#     elif isinstance(path_to_files, list) or isinstance(path_to_files, tuple):
+#         end_string = []
+#         for curr_path_to_file in path_to_files:
+#             if os.path.isfile(curr_path_to_file):
+#                 logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
+#                 end_string.append(select_tracks(path_to_file=path_to_files,
+#                                                 results_directory=results_directory,
+#                                                 fps=fps,
+#                                                 frame_height=frame_height,
+#                                                 frame_width=frame_width,
+#                                                 settings=settings))
+#             else:
+#                 logger.warning('File {} was skipped during evaluation, '
+#                                'file did not exist or could not be accessed. '.format(curr_path_to_file))
+#     else:
+#         end_string = 'Passed wrong argument(s) to start_it_up(): {}, ' \
+#                      'should be string/path or list of strings/paths. Argument: ' \
+#                      '{}'.format(type(path_to_files), path_to_files)
+#         logger.critical(end_string)
+#     return end_string
+#
+#
+# if __name__ == '__main__':
+#     t_one = datetime.now()  # to get rough time estimation
+#     # Log message setup
+#     settings_ = get_configs()  # Get settings
+#     if settings_ is None:
+#         sys.exit('Fatal error in retrieving tracking.ini')
+#     # _backup()
+#     queue_listener, format_for_logging = get_loggers(
+#         log_level=settings_['log_level'],
+#         logfile_name=settings_['log file path'],
+#         short_stream_output=settings_['shorten displayed logging output'],
+#         short_file_output=settings_['shorten logfile logging output'],
+#         log_to_file=settings_['log to file'],
+#     )
+#     # Log some general stuff
+#     logger_main = logging.getLogger('ei').getChild(__name__)
+#     explain_logger_setup = format_for_logging.format(**{
+#         'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
+#         'name': 'logger name',
+#         'funcName': 'function name',
+#         'lineno': 'lNr',
+#         'levelname': 'level',
+#         'process': 'PID',
+#         'message': 'Message (lNr: line number, PID: Process ID)'
+#     })
+#     filler_for_logger = ''  # Stupid tabs
+#     for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
+#         filler_for_logger += '#' * len(sub_string) + '\t'
+#     filler_for_logger = filler_for_logger[:-1]  # remove last tab
+#     logger_main.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
+#
+#     pool = mp.Pool()
+#     main_files = find_paths(base_path='D:/Motility/190808/',
+#                             extension='data.csv', minimal_age=0)
+#     if not main_files:
+#         logger_main.debug('No Paths provided.')
+#         queue_listener.stop()
+#         sys.exit()
+#     for file in main_files:
+#         logger_main.debug('{}'.format(file))
+#     main_folder_time = str(strftime('%y%m%d', localtime()))
+#     main_dir_form = '{}/{}_Results/'
+#     if isinstance(main_files, str) or isinstance(main_files, os.PathLike):
+#         main_daily_directory = main_dir_form.format(os.path.dirname(main_files), main_folder_time)
+#     elif isinstance(main_files, list) or isinstance(main_files, tuple):
+#         main_daily_directory = main_dir_form.format(os.path.dirname(main_files[0]), main_folder_time)
+#     else:
+#         logger_main.critical('Could not access base path in path to files; '
+#                              'results folder set to {}'.format(os.path.abspath('./')))
+#         main_daily_directory = main_dir_form.format('.', main_folder_time)
+#     if not os.path.exists(main_daily_directory):
+#         try:
+#             os.makedirs(main_daily_directory)
+#             logger_main.info('Results folder: {}'.format(main_daily_directory))
+#         except OSError as mkdir_error:
+#             logger_main.exception(mkdir_error)
+#             logger_main.warning('Unable to create {}, directory changed to {}'.format(
+#                 main_daily_directory, os.path.abspath('./')))
+#             main_daily_directory = './'
+#         finally:
+#             pass
+#     logger_main.info('Paths: {}'.format(len(main_files)))
+#
+#     for d in main_files:
+#         # pool.apply_async(start_it_up, args=(d,))
+#         # start_it_up(path_to_files=d, create_logger=False, settings=settings_)
+#         evaluate_tracks(path_to_file=d,
+#                         results_directory=create_results_folder(os.path.dirname(d)),
+#
+#                         )
+#     pool.close()
+#     pool.join()
+#     logger_main.debug('Elapsed time: {}'.format(elapsed_time(t_one)))
+#     queue_listener.stop()

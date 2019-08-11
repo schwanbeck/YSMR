@@ -14,6 +14,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 details. You should have received a copy of the GNU General Public License along with YSMR. If
 not, see <http://www.gnu.org/licenses/>.
 """
+
 import collections
 import configparser
 import logging
@@ -599,7 +600,7 @@ def get_configs(tracking_ini_filepath=None):
 
                 # _config['BASIC TRACK DATA ANALYSIS SETTINGS']
                 'minimal length in seconds': basic_track.getfloat('minimal length in seconds'),
-                'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),  # __RENAMED__
+                'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),
                 'minimal angle in degrees for turning point': basic_track.getfloat(
                     'minimal angle in degrees for turning point'),  # __RENAMED__
                 'extreme area outliers lower end in px*px': basic_track.getint(
@@ -886,7 +887,6 @@ def get_any_paths(prev_dir=None, rename=False):
         root = Tk()
         root.overrideredirect(1)  # hide the root window
         root.withdraw()
-        # must be -defaultextension, -filetypes, -initialdir, -initialfile, -multiple, -parent, -title, or -typevariable
         paths = filedialog.askopenfilenames(
             title='Choose files. ',
             filetypes=filetypes,

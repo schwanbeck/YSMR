@@ -17,7 +17,6 @@ not, see <http://www.gnu.org/licenses/>.
 
 import logging
 
-import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib as mpl
@@ -211,54 +210,70 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     plt.close()
 
 
-def violin_plot(df, save_path, name_of_columns, category, cut_off_list, dpi=300):
-    return None
+def violin_plot(df, save_path, category, cut_off_list, axis=None, dpi=300):
     logger = logging.getLogger('ei').getChild(__name__)
-    fig = plt.figure()
-    fig.set_size_inches(11.6929133858, 8.2677165354)
-    ax = fig.add_subplot(111)
-    ax.grid(axis='y',
-            which='major',
-            # color='gray',
-            alpha=0.80, )
+    save_fig = False
+    if axis is None:  # in case it's not plotted/saved directly
+        fig = plt.figure()
+        fig.set_size_inches(11.6929133858, 8.2677165354)
+        axis = fig.add_subplot(111)  # so we have an axis element
+        save_fig = True
+    axis.grid(axis='y',
+              which='major',
+              # color='gray',
+              alpha=0.80, )
 
-    sns.violinplot(y=df[name_of_columns],
+    sns.violinplot(y=df[category],
                    x=df['Categories'],
                    # hue=df_stats[name_of_columns[-1]],
                    # dodge=False,
                    orient='v',
                    cut=0,
-                   ax=ax,
+                   ax=axis,
                    scale='count',  # 'width' 'count' 'area'
                    width=0.95,
                    linewidth=1,
                    bw=.2,
                    # inner='stick',
                    )
-    sns.despine(ax=ax, offset=0)
-    ax.set_title('\n\n')
+    # Remove top and right border
+    sns.despine(ax=axis, offset=0)
+    # Empty title so there's 2 lines of space for the text boxes
+    axis.set_title('\n\n')
+    # set up data for text boxes
     text_boxes = []
+    all_entries = sum(df['Categories'] == cut_off_list[0][2])
     for idx_textbox in range(len(cut_off_list)):
         curr_category = cut_off_list[idx_textbox][2]
         curr_entries = sum(df['Categories'] == curr_category)
-        df_subset = df.loc[df['Categories'] == curr_category, name_of_columns]
+        df_subset = df.loc[df['Categories'] == curr_category, category]
         median = df_subset.median()
         average = df_subset.mean()
         if np.isnan(median):
             continue
+        if all_entries > 0:
+            curr_percentage = curr_entries / all_entries
+        else:
+            curr_percentage = 'error'
+        text_boxes.append((curr_category, curr_percentage, median, average))
 
+    # Create description (title) for each violin plot
     for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(text_boxes):
-        ax.text(idx_textbox / len(text_boxes) + 0.015, 1.005,
-                '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
-                    curr_category, curr_percentage,
-                    qm_plot,
-                    average_plot),
-                # Set Textbox to relative position instead of absolute xy coordinates (0-1
-                transform=ax.transAxes,
-                )
-    plt.savefig(save_path, dpi=dpi)
-    logger.debug('Saving figure {}'.format(save_path))
-    plt.close()
+        axis.text(
+            idx_textbox / len(text_boxes) + 0.015, 1.005,
+            '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
+                curr_category, curr_percentage,
+                qm_plot,
+                average_plot),
+            # Set Textbox to relative position instead of absolute xy coordinates (0-1
+            transform=axis.transAxes,
+            )
+    if save_fig:
+        plt.savefig(save_path, dpi=dpi)
+        logger.debug('Saving figure {}'.format(save_path))
+        plt.close()
+    else:
+        return axis
 
 
 """
