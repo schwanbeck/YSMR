@@ -17,11 +17,11 @@ not, see <http://www.gnu.org/licenses/>.
 
 import logging
 
-import numpy as np
-import seaborn as sns
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 
 
 def angle_distribution_plot(df, bins_number, plot_title_name, save_path, dpi=300):
@@ -261,7 +261,7 @@ def violin_plot(df, save_path, category, cut_off_list, axis=None, dpi=300):
     for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(text_boxes):
         axis.text(
             idx_textbox / len(text_boxes) + 0.015, 1.005,
-            '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
+            '{}: {:.1%}\nMedian: {:.2f}\nAverage:  {:.2f}'.format(
                 curr_category, curr_percentage,
                 qm_plot,
                 average_plot),

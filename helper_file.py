@@ -127,14 +127,14 @@ def create_configs():
         'frame height': 922,
         'frame width': 1228,
         'white bacteria on dark background': True,
-        'rod shaped bacteria': True,  # NEW
+        'rod shaped bacteria': True,
         'threshold offset for detection': 5,
     }
 
     _config['BASIC TRACK DATA ANALYSIS SETTINGS'] = {
         'minimal length in seconds': 20.0,
-        'limit track length to x seconds': 20.0,  # __RENAMED__
-        'minimal angle in degrees for turning point': 30.0,  # __RENAMED__
+        'limit track length to x seconds': 20.0,
+        'minimal angle in degrees for turning point': 30.0,
         'extreme area outliers lower end in px*px': 2,
         'extreme area outliers upper end in px*px': 50,
     }
@@ -142,32 +142,34 @@ def create_configs():
     _config['DISPLAY SETTINGS'] = {
         'user input': True,
         'select files': True,
-        'display video analysis': True,  # __RENAMED__
+        'display video analysis': True,
         'save video': False,
     }
 
     _config['RESULTS SETTINGS'] = {
         'rename previous result .csv': False,
         'delete .csv file after analysis': False,
-        'store processed .csv file': True,  # NEW
-        'store generated statistical .csv file': True,  # NEW
-        'save large plots': True,  # __RENAMED__
-        'save rose plot': True,  # NEW
-        'save time violin plot': True,  # NEW
-        'save acr violin plot': True,  # NEW
-        'save length violin plot': True,  # NEW
-        'save turning point violin plot': True,  # NEW
-        'save speed violin plot': True,  # NEW
-        'save angle distribution plot / bins': 36,  # NEW
+        'store processed .csv file': True,
+        'store generated statistical .csv file': True,
+        'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)': 'perc. motile',
+        'save large plots': True,
+        'save rose plot': True,
+        'save time violin plot': True,
+        'save acr violin plot': True,
+        'save length violin plot': True,
+        'save turning point violin plot': True,
+        'save speed violin plot': True,
+        'save angle distribution plot / bins': 36,
+        'save displacement violin plot': True,
         'collate results csv to xlsx': True,
         # @todo: group split selector / group split unit for violin plots
     }
 
     _config['LOGGING SETTINGS'] = {
-        'log to file': True,  # NEW
+        'log to file': True,
         'log file path': './logfile.log',
         'shorten displayed logging output': False,
-        'shorten logfile logging output': False,  # NEW
+        'shorten logfile logging output': False,
         'set logging level (debug/info/warning/critical)': 'debug',
         'verbose': False,
     }
@@ -179,7 +181,7 @@ def create_configs():
         'maximal video file age (infinite or seconds)': 'infinite',
         'minimal video file age in seconds': 0,
         'minimal frame count': 600,
-        'stop evaluation on error': True,  # __RENAMED__
+        'stop evaluation on error': True,
         'list save length interval': 10000,
     }
 
@@ -199,7 +201,7 @@ def create_configs():
         'limit track length exactly': False,
         'compare angle between n frames': 10,
         # @todo SPYS = [e.strip() for e in parser.get('global', 'spys').split(',')],
-        'force tracking.ini fps settings': False,  # NEW
+        'force tracking.ini fps settings': False,
     }
 
     _config['HOUSEKEEPING'] = {
@@ -576,6 +578,10 @@ def get_configs(tracking_ini_filepath=None):
                 'store processed .csv file': results.getboolean('store processed .csv file'),  # NEW
                 'store generated statistical .csv file': results.getboolean(
                     'store generated statistical .csv file'),  # NEW
+                'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)':
+                    results.get(
+                        'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)'
+                    ),
                 'save large plots': results.getboolean('save large plots'),  # __RENAMED__
                 'save rose plot': results.getboolean('save rose plot'),  # NEW
                 'save time violin plot': results.getboolean('save time violin plot'),  # NEW
@@ -584,6 +590,7 @@ def get_configs(tracking_ini_filepath=None):
                 'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
                 'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
                 'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
+                'save displacement violin plot': results.getboolean('save displacement violin plot'),
                 'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
                 # @todo:  .get(# @todo)split selector / group split unit for violin plots
 

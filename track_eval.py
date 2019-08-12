@@ -986,7 +986,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # Source: ALollz, stackoverflow.com/questions/51064346/
     # Get largest displacement during track
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
-    size_series = df.groupby('TRACK_ID')['area'].mean()
     time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
     time_series = (time_series + 1) / fps  # off-by-one error
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
@@ -997,6 +996,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         (np.where(motile_total_series != 0,
                   dist_series / time_series,
                   0)), index=time_series.index)
+    acr_series = pd.Series(
+        (np.where(dist_series != 0,
+                  pdist_series / dist_series,
+                  0
+                  )), index=time_series.index)
     turn_percent_series = df.groupby('TRACK_ID')['turn_points'].agg('sum')
     # Avoid div. by 0:
     turn_percent_series = pd.Series(
@@ -1008,9 +1012,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                        'Distance (µm)',  # 1
                        'Speed (µm/s)',  # 2
                        'Time (s)',  # 3
-                       'Displacement',  # 4
+                       'Displacement (µm)',  # 4
                        '% motile',  # 5
-                       'Area (µm^2)',  # 6
+                       'arc-chord ratio',  # 6
                        ]
     # Create df for statistics
     df_stats = pd.concat(
@@ -1020,7 +1024,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
          time_series,  # 3
          pdist_series,  # 4
          motile_series,  # 5
-         size_series,  # 6
+         acr_series,  # 6
          ],
         keys=name_of_columns, axis=1
     )
@@ -1044,9 +1048,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                          1, 0).sum() / all_entries
     # median, 75 percentile, for motile/immotile decision
     median_perc_motility, q3_perc_motility = df_stats[name_of_columns[5]].quantile(q=(0.5, 0.75))  # '% motile'
-    logger.debug('Motile: {} Twitching: {} Median % molility: {} q3 % motility: {}'.format(
-        motile, twitching, median_perc_motility, q3_perc_motility  # @todo: fix predictions
-    ))
     if median_perc_motility > 0.5:
         if motile >= 2 * twitching:  # low null point/sec fraction is larger
             prediction = 'Motile'
@@ -1060,7 +1061,10 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         prediction = 'Immotile'
     else:
         prediction = 'Mixture of motile and immotile cells'
-
+    logger.debug('Motile: {:.2%} Twitching: {:.2%} Median % molility: {:.2%} '
+                 'q3 % motility: {:.2%}, prediction: {}'.format(
+        motile, twitching, median_perc_motility, q3_perc_motility, prediction  # @todo: fix predictions
+    ))
     q1_time, q2_time, q3_time = np.quantile(df_stats[name_of_columns[3]], (0.25, 0.5, 0.75))  # 'Time (s)',  # 3
     logger.debug('Time duration of selected tracks min: {:.3f}, max: '
                  '{:.3f}, Quantiles (25/50/75%): {:.3f}, {:.3f}, {:.3f}'
@@ -1078,7 +1082,17 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     df_stats['Categories'] = name_all_categories
     df_stats_seaborne = df_stats.copy()
-    cut_off_parameter = name_of_columns[5]  # 'Turn Points (TP/s)',  # 0
+    cut_off = settings['split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)']
+    cut_off_parameter = None
+    for name in name_of_columns:
+        if cut_off.lower() in name.lower():
+            cut_off_parameter = name
+            break
+    if not cut_off_parameter:
+        logger.warning(
+            'Setting \'split results by parameter (Turn Points / Distance / Speed / Time / Displacement / % motile)\' '
+            'could not be assigned, reverted to \'perc. motile\'.')
+        cut_off_parameter = name_of_columns[5]
 
     # To drop unassigned values later
     df_stats_seaborne['Categories'] = np.NaN
@@ -1128,13 +1142,30 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                    save_path=save_path.format('rose_graph', '.png'),
                    dist_min=distance_min,
                    dist_max=distance_max)
-    for name in name_of_columns:
+    violin_plots = []
+    if settings['save turning point violin plot']:
+        violin_plots.append((name_of_columns[0], 'turning_points'))
+    if settings['save length violin plot']:
+        violin_plots.append((name_of_columns[1], 'distance'))
+    if settings['save speed violin plot']:
+        violin_plots.append((name_of_columns[2], 'speed'))
+    if settings['save time violin plot']:
+        violin_plots.append((name_of_columns[3], 'time_plot'))
+    if settings['save displacement violin plot']:
+        violin_plots.append((name_of_columns[4], 'displacement'))
+    # if settings['percent motile']:
+    #     violin_plots.append((name_of_columns[5], '% motile'))
+    if settings['save acr violin plot']:
+        violin_plots.append((name_of_columns[6], 'arc-chord_ratio'))
+
+    for category, plot_name in violin_plots:
         violin_plot(
             df=df_stats_seaborne,
-            save_path=save_path.format(name[:5], '.png'),
-            category=name,
+            save_path=save_path.format(plot_name, '.png'),
+            category=category,
             cut_off_list=cut_off_list,
         )
+
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
     return end_string
