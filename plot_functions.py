@@ -210,7 +210,7 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     plt.close()
 
 
-def violin_plot(df, save_path, category, cut_off_list, axis=None, dpi=300):
+def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=None, dpi=300):
     logger = logging.getLogger('ei').getChild(__name__)
     save_fig = False
     if axis is None:  # in case it's not plotted/saved directly
@@ -222,9 +222,8 @@ def violin_plot(df, save_path, category, cut_off_list, axis=None, dpi=300):
               which='major',
               # color='gray',
               alpha=0.80, )
-
     sns.violinplot(y=df[category],
-                   x=df['Categories'],
+                   x=df[cut_off_category],
                    # hue=df_stats[name_of_columns[-1]],
                    # dodge=False,
                    orient='v',
@@ -242,11 +241,11 @@ def violin_plot(df, save_path, category, cut_off_list, axis=None, dpi=300):
     axis.set_title('\n\n')
     # set up data for text boxes
     text_boxes = []
-    all_entries = sum(df['Categories'] == cut_off_list[0][2])
+    all_entries = sum(df[cut_off_category] == cut_off_list[0][2])
     for idx_textbox in range(len(cut_off_list)):
         curr_category = cut_off_list[idx_textbox][2]
-        curr_entries = sum(df['Categories'] == curr_category)
-        df_subset = df.loc[df['Categories'] == curr_category, category]
+        curr_entries = sum(df[cut_off_category] == curr_category)
+        df_subset = df.loc[df[cut_off_category] == curr_category, category]
         median = df_subset.median()
         average = df_subset.mean()
         if np.isnan(median):

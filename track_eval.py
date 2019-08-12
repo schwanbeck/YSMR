@@ -1013,8 +1013,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                        'Speed (µm/s)',  # 2
                        'Time (s)',  # 3
                        'Displacement (µm)',  # 4
-                       '% motile',  # 5
-                       'arc-chord ratio',  # 6
+                       'Perc. Motile',  # 5
+                       'Arc-Chord Ratio',  # 6
                        ]
     # Create df for statistics
     df_stats = pd.concat(
@@ -1080,8 +1080,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                     (0.1, 0.4, '0.1 - 0.4'),
                     (0.4, np.inf, '0.4 +')]
 
-    df_stats['Categories'] = name_all_categories
-    df_stats_seaborne = df_stats.copy()
     cut_off = settings['split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)']
     cut_off_parameter = None
     for name in name_of_columns:
@@ -1093,35 +1091,38 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             'Setting \'split results by parameter (Turn Points / Distance / Speed / Time / Displacement / % motile)\' '
             'could not be assigned, reverted to \'perc. motile\'.')
         cut_off_parameter = name_of_columns[5]
+    cut_off_category = 'Categories ({})'.format(cut_off_parameter)
+    df_stats[cut_off_category] = name_all_categories
+    df_stats_seaborne = df_stats.copy()
 
     # To drop unassigned values later
-    df_stats_seaborne['Categories'] = np.NaN
+    df_stats_seaborne[cut_off_category] = np.NaN
     for index_cut_off, (low, high, category) in enumerate(cut_off_list):
         # Since we'll concatenate df_stats to df_stats_seaborne, which already contains all
         if category == name_all_categories:
             continue
         # inclusive low, exclusive high
-        df_stats_seaborne['Categories'] = np.where(
+        df_stats_seaborne[cut_off_category] = np.where(
             (low <= df_stats[cut_off_parameter]) &
             (high > df_stats[cut_off_parameter]),
             index_cut_off,
-            df_stats_seaborne['Categories']
+            df_stats_seaborne[cut_off_category]
         )
     # All np.NaN in column get replaced with str when str values are set within column -> easier to exchange later
-    df_stats_seaborne.dropna(subset=['Categories'], inplace=True)
+    df_stats_seaborne.dropna(subset=[cut_off_category], inplace=True)
 
     # Exchange int values in 'Categories' for correct labels
-    df_stats_seaborne['Categories'].replace(  # name_all_categories is not present and can be skipped
+    df_stats_seaborne[cut_off_category].replace(  # name_all_categories is not present and can be skipped
         {value: key for key, value in zip([i for (_, _, i) in cut_off_list[1:]], range(1, len(cut_off_list)))},
         inplace=True)
 
     # Put name_all_categories and assigned categories in one df
     df_stats_seaborne = pd.concat([df_stats, df_stats_seaborne], ignore_index=True)
 
-    # Get name of categories, assign values in ascending order, sort df_stats_seaborne['Categories'] by order/dict
+    # Get name of categories, assign values in ascending order, sort df_stats_seaborne[cut_off_category] by order/dict
     categories = {key: value for key, value in zip([i for (_, _, i) in cut_off_list], range(0, len(cut_off_list)))}
     # sort df_stats_seaborne by generated dict key:value pairs (in order of cut_off_list)
-    df_stats_seaborne = df_stats_seaborne.iloc[df_stats_seaborne['Categories'].map(categories).sort_values().index]
+    df_stats_seaborne = df_stats_seaborne.iloc[df_stats_seaborne[cut_off_category].map(categories).sort_values().index]
 
     distance_min = df_stats[name_of_columns[1]].min()  # 'Distance (micrometre)',  # 1
     distance_max = df_stats[name_of_columns[1]].max()
@@ -1162,6 +1163,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         violin_plot(
             df=df_stats_seaborne,
             save_path=save_path.format(plot_name, '.png'),
+            cut_off_category=cut_off_category,
             category=category,
             cut_off_list=cut_off_list,
         )
