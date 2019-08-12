@@ -18,7 +18,7 @@ not, see <http://www.gnu.org/licenses/>.
 import logging
 import os
 from datetime import datetime
-from time import strftime, localtime, strptime
+from time import strftime, strptime
 
 import cv2
 import matplotlib.pyplot as plt
@@ -27,19 +27,8 @@ import pandas as pd
 from scipy.signal import medfilt
 from scipy.spatial import distance as dist
 
-from helper_file import (
-    _backup,
-    # _mkdir,
-    create_results_folder,
-    different_tracks,
-    # get_colour_map,
-    get_configs,
-    get_data,
-    get_loggers,
-    reshape_result,
-    save_list,
-    sort_list,
-    save_df_to_csv,)
+from helper_file import (create_results_folder, different_tracks, get_configs, get_data, get_loggers, reshape_result,
+                         save_df_to_csv, save_list, sort_list)
 from plot_functions import angle_distribution_plot, large_xy_plot, rose_graph, violin_plot
 from tracker import CentroidTracker
 
@@ -1313,149 +1302,3 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     #             else:
     #                 curr_percentage = 'error'
     #             textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))
-
-
-# def start_it_up(path_to_files, df=None, fps=None, frame_height=None, frame_width=None,
-#                 results_directory=None, settings=None, create_logger=True, ):
-#     logger = logging.getLogger('ei').getChild(__name__)
-#     '''
-#     settings['log_level']
-#     settings['log file path']
-#     settings['shorten displayed logging output']
-#     settings['shorten logfile logging output']
-#     settings['log to file']
-#     '''
-#     settings = get_configs(settings)  # Get settings
-#     if settings is None:
-#         logger.critical('No settings provided / could not get settings for start_it_up().')
-#         return None
-#     if create_logger:
-#         get_loggers(log_level=settings['log_level'],
-#                     logfile_name=settings['log file path'],
-#                     short_stream_output=settings['shorten displayed logging output'],
-#                     short_file_output=settings['shorten logfile logging output'],
-#                     log_to_file=settings['log to file'], )
-#     end_string = None
-#     if results_directory is None:
-#         results_directory = create_results_folder(path=path_to_files)
-#     # Check type of path_to_files
-#     if isinstance(path_to_files, str) or isinstance(path_to_files, os.PathLike):
-#         # Skip list read via get_data() if we have a data frame:
-#         if type(df) is pd.core.frame.DataFrame:
-#             logger.debug('Passing data frame to select_tracks(): {}'.format(path_to_files))
-#             end_string = select_tracks(path_to_file=path_to_files,
-#                                        results_directory=results_directory,
-#                                        df=df,
-#                                        fps=fps,
-#                                        frame_height=frame_height,
-#                                        frame_width=frame_width,
-#                                        settings=settings)
-#         # Proceed normally otherwise:
-#         elif os.path.isfile(path_to_files):
-#             logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
-#             end_string = select_tracks(path_to_file=path_to_files,
-#                                        results_directory=results_directory,
-#                                        fps=fps,
-#                                        frame_height=frame_height,
-#                                        frame_width=frame_width,
-#                                        settings=settings)
-#         else:
-#             logger.warning('File {} was skipped during evaluation, '
-#                            'file did not exist or could not be accessed. '.format(path_to_files))
-#     # If we got an iterable, go through each entry:
-#     elif isinstance(path_to_files, list) or isinstance(path_to_files, tuple):
-#         end_string = []
-#         for curr_path_to_file in path_to_files:
-#             if os.path.isfile(curr_path_to_file):
-#                 logger.debug('Passing string to select_tracks(): {}'.format(path_to_files))
-#                 end_string.append(select_tracks(path_to_file=path_to_files,
-#                                                 results_directory=results_directory,
-#                                                 fps=fps,
-#                                                 frame_height=frame_height,
-#                                                 frame_width=frame_width,
-#                                                 settings=settings))
-#             else:
-#                 logger.warning('File {} was skipped during evaluation, '
-#                                'file did not exist or could not be accessed. '.format(curr_path_to_file))
-#     else:
-#         end_string = 'Passed wrong argument(s) to start_it_up(): {}, ' \
-#                      'should be string/path or list of strings/paths. Argument: ' \
-#                      '{}'.format(type(path_to_files), path_to_files)
-#         logger.critical(end_string)
-#     return end_string
-#
-#
-# if __name__ == '__main__':
-#     t_one = datetime.now()  # to get rough time estimation
-#     # Log message setup
-#     settings_ = get_configs()  # Get settings
-#     if settings_ is None:
-#         sys.exit('Fatal error in retrieving tracking.ini')
-#     # _backup()
-#     queue_listener, format_for_logging = get_loggers(
-#         log_level=settings_['log_level'],
-#         logfile_name=settings_['log file path'],
-#         short_stream_output=settings_['shorten displayed logging output'],
-#         short_file_output=settings_['shorten logfile logging output'],
-#         log_to_file=settings_['log to file'],
-#     )
-#     # Log some general stuff
-#     logger_main = logging.getLogger('ei').getChild(__name__)
-#     explain_logger_setup = format_for_logging.format(**{
-#         'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
-#         'name': 'logger name',
-#         'funcName': 'function name',
-#         'lineno': 'lNr',
-#         'levelname': 'level',
-#         'process': 'PID',
-#         'message': 'Message (lNr: line number, PID: Process ID)'
-#     })
-#     filler_for_logger = ''  # Stupid tabs
-#     for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
-#         filler_for_logger += '#' * len(sub_string) + '\t'
-#     filler_for_logger = filler_for_logger[:-1]  # remove last tab
-#     logger_main.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
-#
-#     pool = mp.Pool()
-#     main_files = find_paths(base_path='D:/Motility/190808/',
-#                             extension='data.csv', minimal_age=0)
-#     if not main_files:
-#         logger_main.debug('No Paths provided.')
-#         queue_listener.stop()
-#         sys.exit()
-#     for file in main_files:
-#         logger_main.debug('{}'.format(file))
-#     main_folder_time = str(strftime('%y%m%d', localtime()))
-#     main_dir_form = '{}/{}_Results/'
-#     if isinstance(main_files, str) or isinstance(main_files, os.PathLike):
-#         main_daily_directory = main_dir_form.format(os.path.dirname(main_files), main_folder_time)
-#     elif isinstance(main_files, list) or isinstance(main_files, tuple):
-#         main_daily_directory = main_dir_form.format(os.path.dirname(main_files[0]), main_folder_time)
-#     else:
-#         logger_main.critical('Could not access base path in path to files; '
-#                              'results folder set to {}'.format(os.path.abspath('./')))
-#         main_daily_directory = main_dir_form.format('.', main_folder_time)
-#     if not os.path.exists(main_daily_directory):
-#         try:
-#             os.makedirs(main_daily_directory)
-#             logger_main.info('Results folder: {}'.format(main_daily_directory))
-#         except OSError as mkdir_error:
-#             logger_main.exception(mkdir_error)
-#             logger_main.warning('Unable to create {}, directory changed to {}'.format(
-#                 main_daily_directory, os.path.abspath('./')))
-#             main_daily_directory = './'
-#         finally:
-#             pass
-#     logger_main.info('Paths: {}'.format(len(main_files)))
-#
-#     for d in main_files:
-#         # pool.apply_async(start_it_up, args=(d,))
-#         # start_it_up(path_to_files=d, create_logger=False, settings=settings_)
-#         evaluate_tracks(path_to_file=d,
-#                         results_directory=create_results_folder(os.path.dirname(d)),
-#
-#                         )
-#     pool.close()
-#     pool.join()
-#     logger_main.debug('Elapsed time: {}'.format(elapsed_time(t_one)))
-#     queue_listener.stop()

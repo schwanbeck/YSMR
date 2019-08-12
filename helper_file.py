@@ -20,16 +20,15 @@ import configparser
 import logging
 import os
 import platform
-import shutil
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from glob import glob
 from itertools import cycle as cycle
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
+from time import localtime, strftime
 from tkinter import filedialog, Tk
-from time import strftime, localtime
 
 import cv2
 import matplotlib.pyplot as plt
@@ -248,49 +247,6 @@ def create_configs():
 if not os.path.isfile('tracking.ini'):  # needed by later functions
     create_configs()
 _config.read('tracking.ini')
-
-
-def _backup(skip_check_time=False, time_delta_days=0, time_delta_hours=0, time_delta_min=15):
-    logger = logging.getLogger('ei').getChild(__name__)
-    last_backup = _config['HOUSEKEEPING'].get('last backup')
-    last_backup = datetime.strptime(last_backup, '%Y-%m-%d %H:%M:%S.%f')
-    now_utc = datetime.utcnow()
-    now = datetime.now()
-    diff = timedelta(days=time_delta_days, hours=time_delta_hours, minutes=time_delta_min)
-    if (now_utc - last_backup) > diff or skip_check_time:
-        logger.info('Creating backup of program')
-        src = os.getcwd()
-        names = os.listdir(src)
-        now_folder = now.strftime('%y%m%d')  # y%m%d%H%M%S
-        dst = 'Q:/Code/{}/YSMR/'.format(now_folder)
-        _mkdir(dst)
-        ignore = shutil.ignore_patterns(
-            '~$*', '._sync*', '.owncloud*', 'Thumbs.db', '*.tmp', 'desktop.ini',
-            '*.partial', '_conflict-*', 'FolderStatistic', 'ignore.patterns', 'Last_Sync',
-            '.PowerFolder*', '(downloadmeta)*',
-        )
-        if ignore is not None:
-            ignored_names = ignore(src, names)
-        else:
-            ignored_names = set()
-
-        for name in names:
-            src_name = os.path.join(src, name)
-            dst_name = os.path.join(dst, name)
-            if name in ignored_names:
-                continue
-            if os.path.isdir(name):
-                continue
-            try:
-                shutil.copy2(src_name, dst_name)
-            except (IOError, os.error, shutil.Error) as why:
-                error = '{2}: {0}, {1}'.format(src_name, dst_name, str(why))
-                logger.debug(error)
-        if not skip_check_time:
-            _config.set('HOUSEKEEPING', 'last backup', str(now_utc))
-            with open('tracking.ini', 'w') as configfile:
-                _config.write(configfile)
-            logger.debug('Previous backup set to {} (local time: {})'.format(now_utc, now))
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
@@ -1297,6 +1253,5 @@ def shutdown(seconds=60):
 
 if __name__ == '__main__':
     get_loggers(log_to_file=False, short_stream_output=True)
-    _backup(skip_check_time=False)
     create_configs()
     sys.exit(0)
