@@ -111,9 +111,9 @@ def analyse(path, settings=None, result_folder=None):
     return return_value
 
 
-def ysmr():
+def ysmr(settings=None, paths=None):
     t_one = datetime.now()  # to get rough time estimation
-    settings = get_configs()  # Get settings
+    settings = get_configs(settings)  # Get settings
     if settings is None:
         sys.exit('Fatal error in retrieving tracking.ini')
     check_logfile(path=settings['log file path'])
@@ -126,7 +126,6 @@ def ysmr():
     )
     logger = logging.getLogger('ei').getChild(__name__)
     filler_for_logger = log_infos(settings=settings, format_for_logging=format_for_logging)
-    # if settings['result folder'] != 'None':
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
         folder_path = os.path.dirname(settings['path to test video'])
@@ -135,21 +134,20 @@ def ysmr():
 
     else:
         if settings['select files']:
-            paths = get_any_paths(rename=True)
+            if not paths:
+                paths = get_any_paths(rename=True)
             if not paths:
                 logger.critical('No files selected.')
                 queue_listener.stop()
                 sys.exit('No files selected.')
-            folder_path = os.path.dirname(paths[0])
         else:
-            paths = [settings['path to test video']]
-            folder_path = os.path.dirname(settings['path to test video'])
+            if not paths:
+                paths = [settings['path to test video']]
             logger.info('Test video path selected')
-            # @todo: get video file list per calling args/argparser
+        folder_path = os.path.dirname(paths[0])
         for path in paths:
             logger.debug(path)
         logger.info('Total number of files: {}'.format(len(paths)))
-        # print('\nTotal number of files: {}'.format(len(paths)))
 
         while settings['user input']:  # give user chance to check input
             logger.debug('Waiting for user input.')

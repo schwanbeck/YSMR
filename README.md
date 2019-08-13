@@ -51,7 +51,7 @@ newly generated when missing or if it cannot be loaded correctly.
 	nice_video.avi.
 	+ Accepts text string.
 + pixel per micrometre : 1.41888781
-	+ The ratio between pixels and micrometres. 
+	+ The ratio between pixels and micrometres in the video file. 
 	+ Accepts a floating point number.
 + frames per second : 30.0
 	+ The frames per second (fps) of the video file. Fallback value for when no fps is provided, for example when 
@@ -115,8 +115,7 @@ newly generated when missing or if it cannot be loaded correctly.
 	will proceed immediately.
 	+ Accepts 'True' or 'False'.
 + select files : True
-	+ When set to True, the user will be prompted to select a folder in which all video files with the specified file 
-	ending will be selected. 
+	+ When set to True, the user will be prompted to select files in a folder which will be used for analysis. 
 	When set to False, the path specified under test settings: 'path to test video' will be used.
 	+ Accepts 'True' or 'False'.
 + display video analysis : False
@@ -142,6 +141,12 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ When set to True, generated .csv files containing general track statistics will be saved in result folder after 
 	analysis.
 	+ Accepts 'True' or 'False'.
++ split results by (turn points / distance / speed / time / displacement / perc. motile) : perc. motile
+    + By which sub-category the generated violin plots should be split. The total will always be displayed.
+    + Accepts 'turn points', 'distance', 'speed', 'time', 'displacement', and 'perc. motile'.
++ split violin plots on : 0, 20, 30, 100
+    + Values at which the selected category is split.
+    + Accepts floating point numbers separated by a ','.
 + save large plots : True
 	+ When set to True a plot with an overview of the position of the tracked bacteria throughout the video will be 
 	generated.
@@ -165,10 +170,16 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ Accepts 'True' or 'False'.
 + save angle distribution plot / bins: 36
 	+ Setting the value to 0 will disable the angle distribution plot.
-	+ ### Angle distribution plot description here
+	+ When set to True, a histogram with the specified bins of all degrees 
 	+ Accepts 'True' or 'False'.
++ save displacement violin plot : True
+    + When set to true a violin plot of the maximal distance between all measured positions of each bacterium will be
+    generated.
+    + Accepts 'True' or 'False'.
 + collate results csv to xlsx: True
-	+ ### distribution here
+	+ When set to true, tries to collate all files ending in _statistics.csv in the generated results folder into one
+	.xlsx file. 
+	+ Requires the optional xlsxwriter package.
 	+ Accepts 'True' or 'False'.
 
 ##### LOGGING SETTINGS
@@ -192,10 +203,6 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ Accepts 'True' or 'False'.
 
 ##### ADVANCED VIDEO SETTINGS
-+ use default extensions (.avi, .mp4, .mov) : True
-	+ When set to true and display settings: 'select files' is set to True, files ending in .avi, .mp4, and .mov will 
-	also be selected in addition to the file ending specified under basic recording settings: 'video extension'.
-	+ Accepts 'True' or 'False'.
 + include luminosity in tracking calculation : False
 	+ When set to True, in addition to the x- and y-position of the bacteria, luminosity will be used as an additional 
 	dimension during tracking.
@@ -203,15 +210,6 @@ newly generated when missing or if it cannot be loaded correctly.
 + color filter : COLOR_BGR2GRAY
 	+ The colour filter conversion used by openCV. Should convert to a grey-scale image.
 	+ Accepts text string of openCV conversion flag or corresponding integer value.
-+ maximal video file age (infinite or seconds) : infinite
-	+ When a value in seconds is given, files older than the specified time will not be used for analysis.
-	+ Depends on 'display settings': 'select files'
-	+ Accepts an integer value or 'infinite'.
-+ minimal video file age in seconds : 0
-	+ When a value in seconds is given, files younger than the specified time will not be used for analysis.
-	+ When set to any negative value, files with a calculated negative age will also be accepted.
-	+ Depends on 'display settings': 'select files'
-	+ Accepts an integer value.
 + minimal frame count : 600
 	+ Minimal frame count of video files. Files with a shorter frame count will be skipped.
 	+ Accepts an integer value.
@@ -290,6 +288,10 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ Difference in frames between which position of bacteria and corresponding angle will be measured.
 	+ Time difference (measured in frames) between bacterial position in between which angle is measured.
 	+ Accepts an integer value.
++ force tracking.ini fps settings : False
+    + When set to true, uses the fps value provided in the tracking.ini file, instead of attempting to read it from the
+    video file.
+    + Accepts 'True' or 'False'.
 
 ##### HOUSEKEEPING
 + previous directory : ./
@@ -306,8 +308,6 @@ newly generated when missing or if it cannot be loaded correctly.
 	threshold of the analysed video file.
 	+ Accepts 'True' or 'False'.
 + path to test video : Q:/test_video.avi
-	+ Accepts text string.
-+ path to test .csv : Q:/test_list.csv
 	+ Accepts text string.
 
 ## Citation
@@ -327,4 +327,5 @@ newly generated when missing or if it cannot be loaded correctly.
 ```
 
 ## Acknowledgements
-The original tracker.py was taken with permission from Adrian Rosebrock (adrian@pyimagesearch.com) from https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/
+The original tracker.py was taken with permission from Adrian Rosebrock (adrian@pyimagesearch.com) from 
+https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/

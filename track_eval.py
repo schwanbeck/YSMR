@@ -17,7 +17,6 @@ not, see <http://www.gnu.org/licenses/>.
 
 import logging
 import os
-from datetime import datetime
 from time import strftime, strptime
 
 import cv2
@@ -40,28 +39,9 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     :param settings: settings from tracking.ini, will be read if not provided
     :type settings: dict
     :param result_folder: path to result folder
-    :return:
+    :return: pandas data frame with results, fps of file, frame width and frame height
     """
     logger = logging.getLogger('ei').getChild(__name__)
-    '''
-    Used settings:
-    settings['minimal frame count']
-    settings['verbose']
-    settings['frames per second']
-    settings['store processed .csv file']
-    settings['debugging']
-    settings['display video analysis']
-    settings['save video']
-    settings['stop evaluation on error']
-    settings['color filter']
-    settings['white bacteria on dark background']
-    settings['threshold offset for detection']
-    settings['include luminosity in tracking calculation']
-    settings['list save length interval']
-    settings['delete .csv file after analysis']
-    # settings['evaluate files after analysis']
-    '''
-    t_one_track_bacteria = datetime.now()
     settings = get_configs(settings)  # Get settings
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
@@ -177,8 +157,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         mean, stddev = cv2.meanStdDev(src[, mean[, stddev[, mask]]]) -> find threshold dynamically works
         gray -> blurred -> Threshold (standard?)
         '''
-        # frame = imutils.resize(frame, width=600)  # Loss of information; harder to detect stuff, gain of speed?
-        # Resizing not necessary and gain in speed doesn't outweigh loss of precision
 
         gray = cv2.cvtColor(frame, settings['color filter'])  # Convert to gray scale
 
@@ -369,34 +347,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     if error_during_read:
         logger.critical('Error during read, stopping before evaluation. File: {}'.format(video_path))
         return None
-    """
-    else:
-    if True:  # settings['evaluate files after analysis']: @todo: change to combination check of plots/csv
-        logger.info('Starting evaluation of file {}'.format(list_name))
-        start_it_up(path_to_files=list_name,
-                    df=df_for_eval,
-                    fps=fps_of_file,
-                    frame_height=frame_height,
-                    frame_width=frame_width,
-                    settings=settings,
-                    create_logger=False,
-                    results_directory=result_folder,
-                    )
-    if settings['delete .csv file after analysis']:
-        logger.info('Removing .csv file: {}'.format(list_name))
-        try:
-            os.remove(list_name)
-        except (OSError, FileNotFoundError):
-            logger.warning('Could not delete file {}'.format(list_name))
-        finally:
-            pass
-    # If everything went well, hand over the list name to the next process
-    logger.info('Finished process - module: {} PID: {}, elapsed time: {}'.format(
-        __name__,
-        os.getpid(),
-        elapsed_time(t_one_track_bacteria))
-        )
-    """
     return df_for_eval, fps_of_file, frame_height, frame_width
 
 
@@ -540,7 +490,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     :param frame_width: frame width
     :param settings: tracking.ini settings
     :type settings: dict
-    :return: @todo define return
+    :return: pandas data frame of selected tracks
     """
     logger = logging.getLogger('ei').getChild(__name__)
     '''
@@ -902,13 +852,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         except ValueError:
             pass
 
-    # @todo: sort plot_title_name out
-    if len(plot_title_name) > 90:
-        plot_title_name_len_half = int(0.5 * len(plot_title_name))
-        plot_title_name_a = plot_title_name[:plot_title_name_len_half]
-        plot_title_name_b = plot_title_name[plot_title_name_len_half:]
-        plot_title_name_c, plot_title_name_d = plot_title_name_b.split(sep=' ', maxsplit=1)
-        plot_title_name = '{}{}\n{}'.format(plot_title_name_a, plot_title_name_c, plot_title_name_d)
+    # if len(plot_title_name) > 90:
+    #     plot_title_name_len_half = int(0.5 * len(plot_title_name))
+    #     plot_title_name_a = plot_title_name[:plot_title_name_len_half]
+    #     plot_title_name_b = plot_title_name[plot_title_name_len_half:]
+    #     plot_title_name_c, plot_title_name_d = plot_title_name_b.split(sep=' ', maxsplit=1)
+    #     plot_title_name = '{}{}\n{}'.format(plot_title_name_a, plot_title_name_c, plot_title_name_d)
 
     # Format general save path
     save_path = '{}{}'.format(results_directory, file_name) + '_{}{}'
@@ -991,6 +940,10 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
     motile_total_series = df.groupby('TRACK_ID')['minimum'].agg('sum')
     motile_series = (motile_total_series / df.groupby('TRACK_ID')['t_norm'].agg('last'))
+    acr_series = np.sqrt(
+        np.square(df.groupby('TRACK_ID')['x_norm'].agg('last')) +
+        np.square(df.groupby('TRACK_ID')['y_norm'].agg('last'))
+    )
     # time, curr_track_null_points_per_s, distance, speed, displacement
     speed_series = pd.Series(
         (np.where(motile_total_series != 0,
@@ -998,7 +951,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                   0)), index=time_series.index)
     acr_series = pd.Series(
         (np.where(dist_series != 0,
-                  pdist_series / dist_series,
+                  acr_series / dist_series,
                   0
                   )), index=time_series.index)
     turn_percent_series = df.groupby('TRACK_ID')['turn_points'].agg('sum')
@@ -1032,8 +985,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     if settings['store generated statistical .csv file']:
         save_df_to_csv(df=df_stats, save_path=save_path.format('statistics', '.csv'))
-    # if not any([]):  @todo: if not any() check for remainder
-    #     return
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
     # total count
     all_entries = df_stats.shape[0]
@@ -1071,15 +1022,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                  ''.format(min(df_stats[name_of_columns[3]]), max(df_stats[name_of_columns[3]]),
                            q1_time, q2_time, q3_time))
 
-    # Calculate df_stats_seaborne for statistical plots
-    name_all_categories = 'All'
-    cut_off_list = [(-1, np.inf, name_all_categories),  # @todo: get categories from user somehow
-                    (-1, 0.02, '0 - 0.02'),
-                    (0.02, 0.1, '0.02 - 0.1'),
-                    # (0.2, 0.3, '0.2 - 0.3'),
-                    (0.1, 0.4, '0.1 - 0.4'),
-                    (0.4, np.inf, '0.4 +')]
-
+    # Prepare cut off list
     cut_off = settings['split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)']
     cut_off_parameter = None
     for name in name_of_columns:
@@ -1091,6 +1034,27 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             'Setting \'split results by parameter (Turn Points / Distance / Speed / Time / Displacement / % motile)\' '
             'could not be assigned, reverted to \'perc. motile\'.')
         cut_off_parameter = name_of_columns[5]
+
+    cut_off_list = settings['split violin plots on']
+    if cut_off_parameter == name_of_columns[5]:
+        for i in cut_off_list:
+            if i > 1:
+                logger.info('Violin plots are set to \'perc. motile\', but \'split violin plots on\' contains values '
+                            'larger than 1. Values have been divided by 100 for use as percentages.')
+                cut_off_list = [i/100 for i in cut_off_list]
+                break
+
+    name_all_categories = 'All'
+    if cut_off_parameter == name_of_columns[5]:
+        cut_off_precursor = [(a, b, '{:.2%} - {:.2%}'.format(a, b)) for a, b in
+                             zip(cut_off_list[:-1], cut_off_list[1:])]
+    else:
+        cut_off_precursor = [(a, b, '{:.2f} - {:.2f}'.format(a, b)) for a, b in
+                             zip(cut_off_list[:-1], cut_off_list[1:])]
+    cut_off_list = [(np.NINF, np.inf, name_all_categories)]  # So one category contains all values
+    cut_off_list.extend(cut_off_precursor)
+
+    # Calculate df_stats_seaborne for statistical plots
     cut_off_category = 'Categories ({})'.format(cut_off_parameter)
     df_stats[cut_off_category] = name_all_categories
     df_stats_seaborne = df_stats.copy()
@@ -1126,7 +1090,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     distance_min = df_stats[name_of_columns[1]].min()  # 'Distance (micrometre)',  # 1
     distance_max = df_stats[name_of_columns[1]].max()
-    # @todo: make dependent on usage of large plot / rose graph
+
     df['distance_colour'] = df.groupby('TRACK_ID')['travelled_dist'].transform('sum') - distance_min
     df['distance_colour'] = df['distance_colour'] / df['distance_colour'].max()
 
@@ -1171,167 +1135,3 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
     return end_string
-
-    # f = plt.figure()
-    # # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
-    # f.set_size_inches(11.6929133858, 8.2677165354)
-    # # @todo: set plot values in .ini?
-    # outer_space = 0.05
-    # inner_space = 0.03
-    # head_space = 0.3
-    # width_space = 0.05
-    # gs1 = gridspec.GridSpec(2, 1, figure=f)
-    # gs1.update(left=outer_space, right=0.5 - inner_space, hspace=head_space, wspace=width_space)
-    # gs2 = gridspec.GridSpec(2, 100, figure=f)
-    # gs2.update(left=0.5 + inner_space, right=1 - outer_space, hspace=head_space, wspace=width_space)
-    #
-    # all_plots = [
-    #     plt.subplot(gs1[0, 0]),  # TPs
-    #     plt.subplot(gs2[0, :-2]),  # xy-centered plots
-    #     plt.subplot(gs1[1, 0]),  # Speed
-    #     plt.subplot(gs2[1, :]),  # time
-    #     plt.subplot(gs2[0, -2:]),  # distance color-map
-    # ]
-    #
-    # ##############################
-    # if settings['verbose']:
-    #     logger.debug('Setting up plots')
-    # # So we get a distance range from 0 to 1 for later color selection
-    # textbox = False
-    # for plot_idx in range(0, len(all_plots), 1):
-    #     if settings['verbose']:
-    #         logger.debug('Plot {} / {}'.format(plot_idx + 1, len(all_plots)))  # in case plotting takes forever
-    #     if plot_idx == 1:  # 0,0 centered plot of all tracks
-    #         all_plots[plot_idx].set_title('{}\nTracks: {}, Prediction: {}'.format(
-    #             plot_title_name, len(diff_tracks_start), prediction))
-    #
-    #         # get relevant columns, sort by distance (descending), then group sorted df by TRACK_ID
-    #         grouped_df = df.loc[
-    #                      :, ['TRACK_ID', 'distance_colour', 'x_norm', 'y_norm']
-    #                      ].sort_values(['distance_colour'], ascending=False).groupby(
-    #             'TRACK_ID', sort=False)['x_norm', 'y_norm', 'distance_colour']
-    #         # @todo: Circles indicate the mean and 90th percentile net displacements
-    #         for name, group in grouped_df:
-    #             all_plots[plot_idx].scatter(
-    #                 group.x_norm,
-    #                 group.y_norm,
-    #                 marker='.',
-    #                 label=name,
-    #                 c=plt.cm.gist_rainbow(group.distance_colour),
-    #                 # vmin=distance_min,
-    #                 # vmax=distance_max,
-    #                 # cmap=plt.cm.gist_rainbow,
-    #                 s=1,
-    #                 lw=0,
-    #             )
-    #         del grouped_df
-    #         all_plots[plot_idx].set_aspect('equal', adjustable='box')
-    #         all_plots[plot_idx].grid(True)
-    #
-    #     elif plot_idx == 4:
-    #         colorbar_map = plt.cm.gist_rainbow
-    #         norm = mpl.colors.Normalize(vmin=distance_min, vmax=distance_max)
-    #         cb = mpl.colorbar.ColorbarBase(all_plots[plot_idx], cmap=colorbar_map, norm=norm, )
-    #         cb.set_label('Distance in \u00B5m')
-    #
-    #     elif plot_idx == 3:
-    #         all_plots[plot_idx].grid(axis='y', which='major',
-    #                                  # color='gray',
-    #                                  alpha=0.80, )
-    #         sns.violinplot(y=df_stats_seaborne[name_of_columns[5]],
-    #                        x=df_stats_seaborne['Categories'],
-    #                        # hue=df_stats[name_of_columns[-1]],
-    #                        # dodge=False,
-    #                        orient='v',
-    #                        cut=0,
-    #                        ax=all_plots[plot_idx],
-    #                        scale='count',  # 'width' 'count' 'area'
-    #                        width=0.95,
-    #                        linewidth=1,
-    #                        bw=.2,
-    #                        # inner='stick',
-    #                        )
-    #         # Remove top and right border
-    #         sns.despine(ax=all_plots[plot_idx], offset=0)
-    #
-    #         # Empty title so there's 2 lines of space for the text boxes
-    #         all_plots[plot_idx].set_title('\n\n')
-    #         textbox_info = []
-    #         for idx_textbox in range(len(cut_off_list)):
-    #             # Select name of current violin plot x axis
-    #             curr_category = cut_off_list[idx_textbox][2]
-    #             # Select current of current column the subset of current x axis, calculate median and mean
-    #             curr_entries = sum(df_stats_seaborne['Categories'] == curr_category)
-    #             # logger.info('Category: {} Counts: {}'.format(curr_category, curr_entries))
-    #             df_stats_subset = df_stats_seaborne.loc[df_stats_seaborne['Categories'] == curr_category,
-    #                                                     name_of_columns[5]]
-    #             # Calculate median and average of current violin plot
-    #             qm_plot = df_stats_subset.median()
-    #             average_plot = df_stats_subset.mean()
-    #             if np.isnan(qm_plot):
-    #                 continue
-    #             if all_entries > 0:
-    #                 curr_percentage = curr_entries / all_entries
-    #             else:
-    #                 curr_percentage = 'error'
-    #             textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))
-    #
-    #         for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(textbox_info):
-    #             all_plots[plot_idx].text(idx_textbox / len(textbox_info) + 0.015, 1.005,
-    #                                      '{}: {:.1%}\nMedian: {:.2%}\nAverage:  {:.2%}'.format(
-    #                                          curr_category, curr_percentage,
-    #                                          qm_plot,
-    #                                          average_plot),
-    #                                      # Set Textbox to relative position instead of absolute xy coordinates (0-1)
-    #                                      transform=all_plots[plot_idx].transAxes,
-    #                                      )
-    #
-    #     else:  # statistical plot
-    #         textbox = True
-    #         all_plots[plot_idx].grid(axis='y', which='major',
-    #                                  # color='gray',
-    #                                  alpha=0.80, )
-    #
-    #         sns.violinplot(y=df_stats_seaborne[name_of_columns[plot_idx]],
-    #                        x=df_stats_seaborne['Categories'],
-    #                        # hue=df_stats[name_of_columns[-1]],
-    #                        # dodge=False,
-    #                        orient='v',
-    #                        cut=0,
-    #                        ax=all_plots[plot_idx],
-    #                        scale='count',  # 'width' 'count' 'area'
-    #                        width=0.95,
-    #                        linewidth=1,
-    #                        bw=.2,
-    #                        # inner='stick',
-    #                        )
-    #         # Remove top and right border
-    #         sns.despine(ax=all_plots[plot_idx], offset=0)
-    #
-    #         # Empty title so there's 2 lines of space for the text boxes
-    #         all_plots[plot_idx].set_title('\n\n')
-    #
-    #         # Create description (title) for each violin plot
-    #     if textbox:
-    #         textbox = False
-    #         # for idx_textbox in range(text_box_count):
-    #         #   (curr_category, curr_percentage, qm_plot, average_plot
-    #         textbox_info = []
-    #         for idx_textbox in range(len(cut_off_list)):
-    #             # Select name of current violin plot x axis
-    #             curr_category = cut_off_list[idx_textbox][2]
-    #             # Select current of current column the subset of current x axis, calculate median and mean
-    #             curr_entries = sum(df_stats_seaborne['Categories'] == curr_category)
-    #             # logger.info('Category: {} Counts: {}'.format(curr_category, curr_entries))
-    #             df_stats_subset = df_stats_seaborne.loc[df_stats_seaborne['Categories'] == curr_category,
-    #                                                     name_of_columns[plot_idx]]
-    #             # Calculate median and average of current violin plot
-    #             qm_plot = df_stats_subset.median()
-    #             average_plot = df_stats_subset.mean()
-    #             if np.isnan(qm_plot):
-    #                 continue
-    #             if all_entries > 0:
-    #                 curr_percentage = curr_entries / all_entries
-    #             else:
-    #                 curr_percentage = 'error'
-    #             textbox_info.append((curr_category, curr_percentage, qm_plot, average_plot))

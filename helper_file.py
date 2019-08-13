@@ -24,14 +24,12 @@ import subprocess
 import sys
 from datetime import datetime
 from glob import glob
-from itertools import cycle as cycle
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from time import localtime, strftime
 from tkinter import filedialog, Tk
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -152,6 +150,7 @@ def create_configs():
         'store processed .csv file': True,
         'store generated statistical .csv file': True,
         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)': 'perc. motile',
+        'split violin plots on': '0, 20, 40, 60, 80, 100',
         'save large plots': True,
         'save rose plot': True,
         'save time violin plot': True,
@@ -175,10 +174,10 @@ def create_configs():
     }
 
     _config['ADVANCED VIDEO SETTINGS'] = {
-        'use default extensions (.avi, .mp4, .mov)': True,
+        # 'use default extensions (.avi, .mp4, .mov)': True,
         'include luminosity in tracking calculation': False,
         'color filter': 'COLOR_BGR2GRAY',
-        'maximal video file age (infinite or seconds)': 'infinite',
+        # 'maximal video file age (infinite or seconds)': 'infinite',
         'minimal video file age in seconds': 0,
         'minimal frame count': 600,
         'stop evaluation on error': True,
@@ -200,7 +199,6 @@ def create_configs():
         'maximal recursion depth': 960,
         'limit track length exactly': False,
         'compare angle between n frames': 10,
-        # @todo SPYS = [e.strip() for e in parser.get('global', 'spys').split(',')],
         'force tracking.ini fps settings': False,
     }
 
@@ -213,7 +211,7 @@ def create_configs():
     _config['TEST SETTINGS'] = {
         'debugging': False,
         'path to test video': 'Q:/test_video.avi',
-        'path to test .csv': 'Q:/test_list.csv',
+        # 'path to test .csv': 'Q:/test_list.csv',
     }
 
     try:
@@ -480,10 +478,6 @@ def get_base_path(rename=False, prev_dir=None):
     return curr_path
 
 
-def get_colour_map(counts, colour_map=plt.cm.gist_rainbow):
-    return cycle(reversed([colour_map(col / counts) for col in range(0, counts + 1, 1)]))
-
-
 def get_configs(tracking_ini_filepath=None):
     """
     Read tracking.ini, convert to dict
@@ -535,14 +529,7 @@ def get_configs(tracking_ini_filepath=None):
                 colour_filter = set_different_colour_filter(colour_filter)
             else:
                 colour_filter = cv2.COLOR_BGR2GRAY
-            max_vid_age = adv_video.get('maximal video file age (infinite or seconds)')
-            try:
-                max_vid_age = int(max_vid_age)
-            except ValueError as max_vid_age_value_error:
-                if max_vid_age.lower() in 'infinite':
-                    max_vid_age = np.inf
-                else:
-                    logger.exception(max_vid_age_value_error)
+            split_on_percentage = [int(i.strip()) for i in results.get('split violin plots on').split(',')]
 
             settings_dict = {
                 # _config['BASIC RECORDING SETTINGS']
@@ -582,6 +569,7 @@ def get_configs(tracking_ini_filepath=None):
                     results.get(
                         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)'
                     ),
+                'split violin plots on': split_on_percentage,
                 'save large plots': results.getboolean('save large plots'),  # __RENAMED__
                 'save rose plot': results.getboolean('save rose plot'),  # NEW
                 'save time violin plot': results.getboolean('save time violin plot'),  # NEW
@@ -592,7 +580,6 @@ def get_configs(tracking_ini_filepath=None):
                 'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
                 'save displacement violin plot': results.getboolean('save displacement violin plot'),
                 'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
-                # @todo:  .get(# @todo)split selector / group split unit for violin plots
 
                 # _config['LOGGING SETTINGS']
                 'log to file': log_settings.getboolean('log to file'),  # NEW
@@ -606,13 +593,9 @@ def get_configs(tracking_ini_filepath=None):
                 'verbose': verbose,
 
                 # _config['ADVANCED VIDEO SETTINGS']
-                'use default extensions (.avi, .mp4, .mov)': adv_video.getboolean(
-                    'use default extensions (.avi, .mp4, .mov)'),
                 'include luminosity in tracking calculation': adv_video.getboolean(
                     'include luminosity in tracking calculation'),
                 'color filter': colour_filter,
-                'maximal video file age (infinite or seconds)': max_vid_age,
-                'minimal video file age in seconds': adv_video.getint('minimal video file age in seconds'),
                 'minimal frame count': adv_video.getint('minimal frame count'),
                 'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),  # __RENAMED__
                 'list save length interval': adv_video.getint('list save length interval'),
@@ -642,7 +625,7 @@ def get_configs(tracking_ini_filepath=None):
                 # _config['TEST SETTINGS']
                 'debugging': test.getboolean('debugging'),
                 'path to test video': test.get('path to test video'),
-                'path to test .csv': test.get('path to test .csv'),
+                # 'path to test .csv': test.get('path to test .csv'),
             }
             if verbose:
                 logger.debug('tracking.ini settings:')
@@ -796,41 +779,6 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     return queue_listener, return_format
 
 
-def get_video_paths(settings):
-    logger = logging.getLogger('ei').getChild(__name__)
-    folder_path = get_base_path(rename=True)
-    if folder_path is None:
-        return None
-    paths = []
-    if settings['use default extensions (.avi, .mp4, .mov)']:
-        extensions = ['.avi', '.mp4', '.mov']
-    else:
-        extensions = []
-    if settings['video extension'] not in extensions:
-        extensions.append(settings['video extension'])
-    ext_message = 'Looking for extensions ending in'
-    for ext in extensions:
-        ext_message += ' {},'.format(ext)
-    logger.info(ext_message[:-1])  # get rid of trailing comma
-    if not extensions:
-        exit_warning = 'No extensions provided / found, please check settings \'video extension\' ' \
-                       'and \'use default extensions (.avi, .mp4, .mov)\' in tracking.ini.\n'
-        logger.critical(exit_warning)
-        return None
-    for ext in extensions:
-        paths.extend(find_paths(base_path=folder_path,
-                                extension=ext,
-                                minimal_age=settings['minimal video file age in seconds'],
-                                maximal_age=settings['maximal video file age (infinite or seconds)'], ))
-    # Remove generated output files
-    paths = [path for path in paths if '_output.' not in path]
-    if not paths:  # Might as well stop, [] == False
-        logger.warning('No acceptable files found in {}\n'.format(folder_path))
-        return None
-    paths.sort()
-    return paths
-
-
 def get_any_paths(prev_dir=None, rename=False):
     logger = logging.getLogger('ei').getChild(__name__)
     if prev_dir is None:
@@ -942,11 +890,11 @@ def log_infos(settings, format_for_logging=None):
             settings['limit track length to x seconds']))
     else:
         logger.info('Full track length will be used in evaluation')
-    if settings['maximal video file age (infinite or seconds)'] == np.inf:
-        logger.debug('maximal video file age (infinite or seconds) set to infinite')
-    else:
-        logger.debug('maximal video file age (infinite or seconds) set to {}'.format(
-            settings['maximal video file age (infinite or seconds)']))
+    # if settings['maximal video file age (infinite or seconds)'] == np.inf:
+    #     logger.debug('maximal video file age (infinite or seconds) set to infinite')
+    # else:
+    #     logger.debug('maximal video file age (infinite or seconds) set to {}'.format(
+    #         settings['maximal video file age (infinite or seconds)']))
 
     # Debug messages
     logger.debug('White bacteria on dark background set to {}'.format(
@@ -1160,31 +1108,6 @@ def set_different_colour_filter(colour_filter_new):
                      'Provided name should have been within possible names. Please update color_filter '
                      'in source code.\nSorry.'.format(colour_filter_new))
     return colour_filter_new  # return flag
-
-
-def shift_np_array(arr, shift, fill_value=np.nan):
-    """
-    # preallocate empty array and assign slice by chrisaycock
-    # See origin:
-    # https://stackoverflow.com/questions/30399534/shift-elements-in-a-numpy-array
-    # Accessed last 2019-04-24 13:37:00,101
-
-    :param arr: array to be shifted
-    :param shift: shift by amount
-    :type shift: int
-    :param fill_value: fill value
-    :return: shifted array
-    """
-    result = np.empty_like(arr)
-    if shift > 0:
-        result[:shift] = fill_value
-        result[shift:] = arr[:-shift]
-    elif shift < 0:
-        result[shift:] = fill_value
-        result[:shift] = arr[-shift:]
-    else:
-        result[:] = arr
-    return result
 
 
 def sort_list(file_path=None, sort=None, df=None, save_file=False):
