@@ -119,7 +119,7 @@ def create_configs():
         pass
 
     _config['BASIC RECORDING SETTINGS'] = {
-        'video extension': '.wmv',
+        # 'video extension': '.wmv',
         'pixel per micrometre': 1.41888781,
         'frames per second': 30.0,
         'frame height': 922,
@@ -533,7 +533,7 @@ def get_configs(tracking_ini_filepath=None):
 
             settings_dict = {
                 # _config['BASIC RECORDING SETTINGS']
-                'video extension': basic_recording.get('video extension'),
+                # 'video extension': basic_recording.get('video extension'),
                 'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
                 'frames per second': basic_recording.getfloat('frames per second'),
                 'frame height': basic_recording.getint('frame height'),

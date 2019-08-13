@@ -44,12 +44,6 @@ Explanation of each setting in the tracking.ini file and the initial default set
 newly generated when missing or if it cannot be loaded correctly.
 
 ##### BASIC RECORDING SETTINGS
-+ video extension : .wmv
-	+ When using display settings: 'select files' this specifies what file ending should be looked for in addition 
-	to the default formats .avi, .mp4, .mov.
-	File selection can also be more specific, i.e. 'nice_video.avi', which would then only select files ending in 
-	nice_video.avi.
-	+ Accepts text string.
 + pixel per micrometre : 1.41888781
 	+ The ratio between pixels and micrometres in the video file. 
 	+ Accepts a floating point number.
