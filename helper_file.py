@@ -273,7 +273,7 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
         old_paths = find_paths(base_path=base_path, extension='{}.*'.format(file_name), recursive=False)
         if old_paths:  # rename old files from .log.1 to .log.9; delete otherwise
             old_paths = sorted(old_paths, reverse=True, key=lambda x: int(x[-1]))
-            counts = [int(count[-1]) for count in old_paths]
+            counts = [float(count[-1]) for count in old_paths]
             if not counts[-1] > 1:  # if smallest number isn't 1, we can stop
                 max_idx = [1]
                 max_idx.extend([s - t for s, t in zip(counts[:-1], counts[1:])])
