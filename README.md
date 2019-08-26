@@ -76,11 +76,11 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ Accepts an integer value.
 
 ##### BASIC TRACK DATA ANALYSIS SETTINGS
-+ minimal length in seconds : 20
++ minimal length in seconds : 20.0
 	+ Minimum time threshold for track analysis. All tracks shorter than this will be discarded. If set to 0, all 
 	tracks will be accepted. 
 	+ Accepts a floating point number.
-+ limit track length to x seconds : 20
++ limit track length to x seconds : 20.0
 	+ Setting the value to 0 will disable the truncation.
 	+ Maximum time for track analysis. All tracks longer than this will be truncated to the set time. If advanced 
 	track data analysis settings: 'track length exactly' is set to False (default) and the truncated track is not as 
@@ -112,7 +112,7 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ When set to True, the user will be prompted to select files in a folder which will be used for analysis. 
 	When set to False, the path specified under test settings: 'path to test video' will be used.
 	+ Accepts 'True' or 'False'.
-+ display video analysis : False
++ display video analysis : True
 	+ When set to True, the video analysis process will be displayed in a window.
 	+ Accepts 'True' or 'False'.
 + save video : False
@@ -125,20 +125,20 @@ newly generated when missing or if it cannot be loaded correctly.
 	will be renamed (i.e. nice_video.avi_list.csv to nice_video.avi_list191224133700.csv). When set to False, previous 
 	tracking result .csv files with the same name will be overwritten.
 	+ Accepts 'True' or 'False'.
-+ delete .csv file after analysis : True
++ delete .csv file after analysis : False
 	+ When set to True, tracking result .csv files will be deleted after completion of analysis.
 	+ Accepts 'True' or 'False'.
-+ store processed .csv file : False
++ store processed .csv file : True
 	+ When set to True, processed tracking result .csv files containing selected tracks will be saved in result folder 
 	after analysis.
-+ store generated statistical .csv file : False
++ store generated statistical .csv file : True
 	+ When set to True, generated .csv files containing general track statistics will be saved in result folder after 
 	analysis.
 	+ Accepts 'True' or 'False'.
 + split results by (turn points / distance / speed / time / displacement / perc. motile) : perc. motile
     + By which sub-category the generated violin plots should be split. The total will always be displayed.
     + Accepts 'turn points', 'distance', 'speed', 'time', 'displacement', and 'perc. motile'.
-+ split violin plots on : 0, 20, 30, 100
++ split violin plots on : 0.0, 20.0, 40.0, 60.0, 80.0, 100.0
     + Values at which the selected category is split.
     + Accepts floating point numbers separated by a ','.
 + save large plots : True
@@ -150,7 +150,7 @@ newly generated when missing or if it cannot be loaded correctly.
 + save time violin plot : True
 	+ When set to True a violin plot of the track times will be generated.
 	+ Accepts 'True' or 'False'.
-+ save acr violin plot : False
++ save acr violin plot : True
 	+ When set to True a violin plot of the tracks arc-chord ratio will be generated.
 	+ Accepts 'True' or 'False'.
 + save length violin plot : True
@@ -178,7 +178,7 @@ newly generated when missing or if it cannot be loaded correctly.
 
 ##### LOGGING SETTINGS
 + log to file : True
-	+ When set to True, the logging output will be saved to file.
+	+ When set to True, the logging output will be saved to a file.
 	+ Accepts 'True' or 'False'.
 + log file path : ./logfile.log
 	+ The log-file save path.
@@ -193,13 +193,13 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ Set the logging level. Fallback value is 'debug'.
 	+ Accepts 'debug', 'info', 'warning', 'critical'.
 + verbose : False
-	+ When set to True the log-level is set to debug and logs additional debug messages.
+	+ When set to True the log-level is set to debug and additional debug messages will be logged.
 	+ Accepts 'True' or 'False'.
 
 ##### ADVANCED VIDEO SETTINGS
 + include luminosity in tracking calculation : False
 	+ When set to True, in addition to the x- and y-position of the bacteria, luminosity will be used as an additional 
-	dimension during tracking.
+	dimension for tracking.
 	+ Accepts 'True' or 'False'.
 + color filter : COLOR_BGR2GRAY
 	+ The colour filter conversion used by openCV. Should convert to a grey-scale image.
@@ -214,10 +214,6 @@ newly generated when missing or if it cannot be loaded correctly.
 + list save length interval : 10000
 	+ Minimal length of tracking result object list before it will be stored on disc.
 	+ Accepts an integer value.
-+ force tracking.ini fps settings : False
-	+ When set to True, the frames per second specified in tracking.ini under basic recording settings: 
-	'frames per second' will be used instead of the fps information provided by the video file.
-	+ Accepts 'True' or 'False'.
 
 ##### ADVANCED TRACK DATA ANALYSIS SETTINGS
 + maximal consecutive holes : 5
@@ -241,7 +237,7 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ The limit for 'try to omit motility outliers'. If the percentage of calculated motility outliers compared to all 
 	data points surpasses the given percentage, 'try to omit motility outliers' will be retroactively disabled.
 	+ Accepts a floating point number.
-+ exclude measurement when above x times average area : 2.0
++ exclude measurement when above x times average area : 1.5
 	+ Setting the value to 0 will disable exclusion.
 	+ Data points with area measurements above x times the average area of the track will be discarded.
 	+ Accepts a floating point number.
