@@ -70,21 +70,22 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         logger.warning('File {} too short; file was skipped. Limit for \'minimal frame count\': {}'.format(
             video_path, settings['minimal frame count']))
         return None
-    try:  # @todo: force tracking.ini fps settings
-        fps_of_file = cap.get(cv2.CAP_PROP_FPS)
-        if settings['verbose'] or fps_of_file != settings['frames per second']:
-            logger.info('fps of file: {}'.format(fps_of_file))
-    except Exception as ex:
-        template = 'An exception of type {0} occurred while accessing fps from file {2}. Arguments:\n{1!r}'
-        logger.exception(template.format(type(ex).__name__, ex.args, video_path))
-        if settings['frames per second'] <= 0:
-            logger.critical('User defined fps unacceptable: type: {} value: {}'.format(
-                type(settings['frames per second']), settings['frames per second']))
-            return None
-        else:
-            fps_of_file = settings['frames per second']
-    finally:
-        pass
+    if not settings['force tracking.ini fps settings']:
+        try:
+            fps_of_file = cap.get(cv2.CAP_PROP_FPS)
+            if settings['verbose'] or fps_of_file != settings['frames per second']:
+                logger.info('fps of file: {}'.format(fps_of_file))
+        except Exception as ex:
+            template = 'An exception of type {0} occurred while accessing fps from file {2}. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args, video_path))
+            if settings['frames per second'] <= 0:
+                logger.critical('User defined fps unacceptable: type: {} value: {}'.format(
+                    type(settings['frames per second']), settings['frames per second']))
+                return None
+            else:
+                fps_of_file = settings['frames per second']
+    else:
+        fps_of_file = settings['frames per second']
     if settings['save video'] and not result_folder:
         result_folder = create_results_folder(video_path)
 
@@ -388,15 +389,6 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
     2: average ratio not within bounds
     1: average x/y not within bounds
     0: pass
-    
-    Used settings:
-    settings['minimal length in seconds']
-    settings['maximal consecutive holes']
-    settings['maximal empty frames in %']
-    settings['average width/height ratio min.']
-    settings['average width/height ratio max.']
-    settings['percent of screen edges to exclude']
-    settings['maximal recursion depth']
     '''
     kick_reason = 7
     return_result = []
@@ -493,28 +485,6 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     :return: pandas data frame of selected tracks
     """
     logger = logging.getLogger('ei').getChild(__name__)
-    '''
-    settings['verbose']
-    settings['path to test .csv']
-    settings['frames per second']
-    settings['minimal length in seconds']
-    settings['force tracking.ini fps settings']
-    settings['limit track length to x seconds']
-    settings['extreme area outliers lower end in px*px']
-    settings['extreme area outliers upper end in px*px']
-    settings['frame width']
-    settings['frame height']
-    settings['pixel per micrometre']
-    settings['exclude measurement when above x times average area']
-    settings['percent quantiles excluded area']
-    settings['try to omit motility outliers']
-    settings['stop excluding motility outliers if total count above percent']
-    settings['limit track length to x seconds']
-    settings['limit track length exactly']
-    settings['compare angle between n frames']
-    settings['minimal angle in degrees for turning point']
-    settings['save large plots']
-    '''
     settings = get_configs(settings)  # Get settings
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
@@ -758,12 +728,10 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     1 average x/y not within bounds
     0 pass
     '''
-    kick_reasons_string = 'Total: {8} size < 600: {7} holes > 6: {6} ' \
-                          'distance outlier: {5} duration 5% over size: {4} ' \
-                          'area out of bounds: {3} ratio wrong: {2} ' \
-                          'screen edge: {1} passed: {0} \t{8},'.format(*kick_reasons, sum(kick_reasons))
-    for reason in reversed(kick_reasons):  # @todo: remove
-        kick_reasons_string += '{},'.format(reason)
+    kick_reasons_string = 'Total: {8}; size < 600: {7}; holes > 6: {6}; ' \
+                          'distance outlier: {5}; duration 5% over size: {4}; ' \
+                          'area out of bounds: {3}; ratio wrong: {2}; ' \
+                          'screen edge: {1}; passed: {0}'.format(*kick_reasons, sum(kick_reasons))
     if kick_reasons[0] < 1000 and kick_reasons[0] / sum(kick_reasons) < 0.3:
         logger.warning('Low amount of accepted tracks')
         logger.warning(kick_reasons_string)
