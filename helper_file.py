@@ -75,7 +75,10 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
     if save_path is None:
         save_path = './'
     if path is None:
-        path = get_base_path(rename=False)
+        path = get_any_paths(rename=False, file_types=[
+            ('csv', '.csv'),
+            ('all files', '.*'),
+        ])
     file_path = '{}{}_collated_statistics.xlsx'.format(save_path, datetime.now().strftime('%y%m%d%H%M%S'))
     paths = find_paths(base_path=path, extension=csv_extension)
     if paths:
@@ -101,25 +104,26 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
         logger.info('Could not find paths.')
 
 
-def create_configs():
+def create_configs(config_filepath=None):
     """
     generates the tracking.ini config file and tries to open it for editing.
+    :param config_filepath: optional file path
     :return: None
     """
     logger = logging.getLogger('ei').getChild(__name__)
     # path = os.path.join(os.path.expanduser("~"), '.config/ysmr')
     # import xdg -> ~/$XDG_CONFIG_HOME/ysmr
     # %APPDATA%: path = os.getenv('APPDATA') + ysmr
-    configfilepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
+    if config_filepath is None:
+        config_filepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
     try:
-        old_tracking_ini = '{}.{}'.format(configfilepath, datetime.now().strftime('%y%m%d%H%M%S'))
-        os.rename(configfilepath, old_tracking_ini)
+        old_tracking_ini = '{}.{}'.format(config_filepath, datetime.now().strftime('%y%m%d%H%M%S'))
+        os.rename(config_filepath, old_tracking_ini)
         logger.warning('Old tracking.ini renamed to {}'.format(old_tracking_ini))
     except FileNotFoundError:
         pass
 
     _config['BASIC RECORDING SETTINGS'] = {
-        # 'video extension': '.wmv',
         'pixel per micrometre': 1.41888781,
         'frames per second': 30.0,
         'frame height': 922,
@@ -150,7 +154,7 @@ def create_configs():
         'store processed .csv file': True,
         'store generated statistical .csv file': True,
         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)': 'perc. motile',
-        'split violin plots on': '0, 20, 40, 60, 80, 100',
+        'split violin plots on': '0.0, 20.0, 40.0, 60.0, 80.0, 100.0',
         'save large plots': True,
         'save rose plot': True,
         'save time violin plot': True,
@@ -161,7 +165,6 @@ def create_configs():
         'save angle distribution plot / bins': 36,
         'save displacement violin plot': True,
         'collate results csv to xlsx': True,
-        # @todo: group split selector / group split unit for violin plots
     }
 
     _config['LOGGING SETTINGS'] = {
@@ -174,10 +177,8 @@ def create_configs():
     }
 
     _config['ADVANCED VIDEO SETTINGS'] = {
-        # 'use default extensions (.avi, .mp4, .mov)': True,
         'include luminosity in tracking calculation': False,
         'color filter': 'COLOR_BGR2GRAY',
-        # 'maximal video file age (infinite or seconds)': 'infinite',
         'minimal video file age in seconds': 0,
         'minimal frame count': 600,
         'stop evaluation on error': True,
@@ -203,7 +204,6 @@ def create_configs():
     }
 
     _config['HOUSEKEEPING'] = {
-        'last backup': '2019-03-29 13:37:30.330330',
         'previous directory': './',
         'shut down after analysis': False,
     }
@@ -211,13 +211,12 @@ def create_configs():
     _config['TEST SETTINGS'] = {
         'debugging': False,
         'path to test video': 'Q:/test_video.avi',
-        # 'path to test .csv': 'Q:/test_list.csv',
     }
 
     try:
-        with open(configfilepath, 'w+') as configfile:
+        with open(config_filepath, 'w+') as configfile:
             _config.write(configfile)
-        logger.critical('tracking.ini was reset to default values. Path: {}'.format(configfilepath))
+        logger.critical('tracking.ini was reset to default values. Path: {}'.format(config_filepath))
     except (IOError, OSError) as configfile_error:
         logger.exception('Could not create config file: {}'.format(configfile_error))
         return
@@ -231,16 +230,19 @@ def create_configs():
         # @todo: untested on linux & mac
         if os.name is 'nt':  # Windows
             # works with spaces in name whereas subprocess.call(('start', path), shell=True) does not
-            response = subprocess.run(('cmd /c start "" "{}"'.format(configfilepath)), stderr=subprocess.PIPE)
+            response = subprocess.run(('cmd /c start "" "{}"'.format(config_filepath)), stderr=subprocess.PIPE)
         elif sys.platform.startswith('darwin'):  # Mac
-            response = subprocess.call(('open', configfilepath), stderr=subprocess.PIPE)
+            response = subprocess.call(('open', config_filepath), stderr=subprocess.PIPE)
         else:  # Linux
-            response = subprocess.call(('xdg-open', configfilepath), stderr=subprocess.PIPE)
+            response = subprocess.call(('xdg-open', config_filepath), stderr=subprocess.PIPE)
         response.check_returncode()
     except (subprocess.CalledProcessError, FileNotFoundError, OSError) as file_open_error:
         logger.exception(file_open_error)
     finally:
-        pass
+        # As the file has to be checked first and the process could
+        # continue with a freshly generated one, we'll stop execution here.
+        logger.critical('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
+        sys.exit('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
 
 
 # Check tracking.ini
@@ -273,7 +275,7 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
         old_paths = find_paths(base_path=base_path, extension='{}.*'.format(file_name), recursive=False)
         if old_paths:  # rename old files from .log.1 to .log.9; delete otherwise
             old_paths = sorted(old_paths, reverse=True, key=lambda x: int(x[-1]))
-            counts = [float(count[-1]) for count in old_paths]
+            counts = [int(count[-1]) for count in old_paths]
             if not counts[-1] > 1:  # if smallest number isn't 1, we can stop
                 max_idx = [1]
                 max_idx.extend([s - t for s, t in zip(counts[:-1], counts[1:])])
@@ -286,11 +288,11 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
                             new_path = '{}{}'.format(old_path[:-1], old_count + 1)
                             if not os.path.isfile(new_path):
                                 os.rename(old_path, new_path)
-                    finally:
+                    except (FileNotFoundError, FileExistsError, PermissionError):
                         pass
         try:
             os.rename(path, '{}.1'.format(path))
-        except (FileNotFoundError, FileExistsError):
+        except (FileNotFoundError, FileExistsError, PermissionError):
             pass
     return path
 
@@ -395,7 +397,7 @@ def elapsed_time(time_one):
 
 def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursive=True):
     """
-    Search for files in provided path
+    Search for files with provided extension in provided path
     :param base_path: path which is checked for files
     :param extension: extension or ending of files
     :type extension: str
@@ -406,10 +408,9 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
     :type recursive: bool
     :return: list of files
     """
-    # @todo: extension -> list; for-loop for ext.
     logger = logging.getLogger('ei').getChild(__name__)
     if not os.path.exists(base_path):
-        logger.critical('Path could not be found: {}'.format(base_path))
+        logger.warning('Path could not be found: {}'.format(base_path))
         return None
     if base_path[-1] != '/':
         base_path = '{}/'.format(base_path)
@@ -430,57 +431,69 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
         else:
             logger.warning('The file appears to be {:.2f} seconds '
                            'from the future and was thus not selected. '
-                           'To circumvent this, set minimal age in tracking.ini'
-                           ' to a negative value. '
                            'File: {}'.format(abs(file_creation_date), file))
     return out_files
 
 
-def get_base_path(rename=False, prev_dir=None):
+def get_any_paths(prev_dir=None, rename=False, file_types=None):
     """
-    Prompt user to provide folder path via tkinter window
-    :param rename: whether to rename the base-path in tracking.ini
+    Ask user for file selection.
+    :param prev_dir: Folder in which to start search
+    :param rename: Whether to rename the previous folder in the config file tracking.ini
     :type rename: bool
-    :param prev_dir: previous directory
-    :return: path
+    :param file_types: Optional list of file extensions which can be included,
+        first extension will be used as default
+    :return: list of files
+    :rtype: list
     """
-    # @todo: get PyQT instead?
     logger = logging.getLogger('ei').getChild(__name__)
     if prev_dir is None:
         try:
             prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
         except configparser.Error:
             prev_dir = './'
+    if file_types is None:
+        file_types = [
+            ('all files', '.*'),
+            ('csv', '.csv'),
+            ('avi', '.avi'),
+            ('mkv', '.mkv'),
+            ('mov', '.mov'),
+            ('mp4', '.mp4'),
+        ]
     try:
         root = Tk()
         root.overrideredirect(1)  # hide the root window
         root.withdraw()
-        curr_path = filedialog.askdirectory(
-            title='Choose a base directory to look for files. ',
-            mustexist=True,
-            initialdir=prev_dir
+        paths = filedialog.askopenfilenames(
+            title='Choose files. ',
+            filetypes=file_types,
+            defaultextension=file_types[0][1],
+            multiple=True,
+            initialdir=prev_dir,
         )
     except Exception as ex:
         template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
         logger.exception(template.format(type(ex).__name__, ex.args))
         return None
-    if not os.path.isdir(curr_path):
-        logger.warning('No Path selected. ')
-        return None
-    if rename:
+    if paths and rename:
+        curr_path = os.path.dirname(paths[0])
         try:
             _config.set('HOUSEKEEPING', 'previous directory', curr_path)
             with open('tracking.ini', 'w') as configfile:
                 _config.write(configfile)
             logger.debug('Previous directory set to {}'.format(curr_path))
-        finally:
+        except (PermissionError, configparser.Error):
             pass
-    return curr_path
+        except Exception as ex:
+            template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args))
+    return paths
 
 
 def get_configs(tracking_ini_filepath=None):
     """
-    Read tracking.ini, convert to dict
+    Read tracking.ini, convert values to usable form and return as dict
     :param tracking_ini_filepath: filepath for tracking.ini
     :return: configs as dict
     :rtype: dict
@@ -493,6 +506,7 @@ def get_configs(tracking_ini_filepath=None):
         if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
             _config.read(tracking_ini_filepath)
         try:
+            # try to get all configs
             basic_recording = _config['BASIC RECORDING SETTINGS']
             basic_track = _config['BASIC TRACK DATA ANALYSIS SETTINGS']
             display = _config['DISPLAY SETTINGS']
@@ -503,6 +517,7 @@ def get_configs(tracking_ini_filepath=None):
             housekeeping = _config['HOUSEKEEPING']
             test = _config['TEST SETTINGS']
 
+            # Convert some values directly into usable form
             verbose = log_settings.getboolean('verbose')
             set_log_level = log_settings.get('set logging level (debug/info/warning/critical)')
             log_levels = {'debug': logging.DEBUG,
@@ -529,25 +544,26 @@ def get_configs(tracking_ini_filepath=None):
                 colour_filter = set_different_colour_filter(colour_filter)
             else:
                 colour_filter = cv2.COLOR_BGR2GRAY
-            split_on_percentage = [int(i.strip()) for i in results.get('split violin plots on').split(',')]
+            # convert string to list of floats
+            split_on_percentage = [float(i.strip()) for i in results.get('split violin plots on').split(',')]
 
+            # one large dict so we can pass it around between functions
             settings_dict = {
                 # _config['BASIC RECORDING SETTINGS']
-                # 'video extension': basic_recording.get('video extension'),
                 'pixel per micrometre': basic_recording.getfloat('pixel per micrometre'),
                 'frames per second': basic_recording.getfloat('frames per second'),
                 'frame height': basic_recording.getint('frame height'),
                 'frame width': basic_recording.getint('frame width'),
                 'white bacteria on dark background': basic_recording.getboolean(
                     'white bacteria on dark background'),
-                'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),  # NEW
+                'rod shaped bacteria': basic_recording.getboolean('rod shaped bacteria'),
                 'threshold offset for detection': basic_recording.getint('threshold offset for detection'),
 
                 # _config['BASIC TRACK DATA ANALYSIS SETTINGS']
                 'minimal length in seconds': basic_track.getfloat('minimal length in seconds'),
                 'limit track length to x seconds': basic_track.getfloat('limit track length to x seconds'),
                 'minimal angle in degrees for turning point': basic_track.getfloat(
-                    'minimal angle in degrees for turning point'),  # __RENAMED__
+                    'minimal angle in degrees for turning point'),
                 'extreme area outliers lower end in px*px': basic_track.getint(
                     'extreme area outliers lower end in px*px'),
                 'extreme area outliers upper end in px*px': basic_track.getint(
@@ -556,38 +572,38 @@ def get_configs(tracking_ini_filepath=None):
                 # _config['DISPLAY SETTINGS']
                 'user input': display.getboolean('user input'),
                 'select files': display.getboolean('select files'),
-                'display video analysis': display.getboolean('display video analysis'),  # __RENAMED__
+                'display video analysis': display.getboolean('display video analysis'),
                 'save video': display.getboolean('save video'),
 
                 # _config['RESULTS SETTINGS']
                 'rename previous result .csv': results.getboolean('rename previous result .csv'),
                 'delete .csv file after analysis': results.getboolean('delete .csv file after analysis'),
-                'store processed .csv file': results.getboolean('store processed .csv file'),  # NEW
+                'store processed .csv file': results.getboolean('store processed .csv file'),
                 'store generated statistical .csv file': results.getboolean(
-                    'store generated statistical .csv file'),  # NEW
+                    'store generated statistical .csv file'),
                 'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)':
                     results.get(
                         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)'
                     ),
                 'split violin plots on': split_on_percentage,
-                'save large plots': results.getboolean('save large plots'),  # __RENAMED__
-                'save rose plot': results.getboolean('save rose plot'),  # NEW
-                'save time violin plot': results.getboolean('save time violin plot'),  # NEW
-                'save acr violin plot': results.getboolean('save acr violin plot'),  # NEW
-                'save length violin plot': results.getboolean('save length violin plot'),  # NEW
-                'save turning point violin plot': results.getboolean('save turning point violin plot'),  # NEW
-                'save speed violin plot': results.getboolean('save speed violin plot'),  # NEW
-                'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),  # NEW
+                'save large plots': results.getboolean('save large plots'),
+                'save rose plot': results.getboolean('save rose plot'),
+                'save time violin plot': results.getboolean('save time violin plot'),
+                'save acr violin plot': results.getboolean('save acr violin plot'),
+                'save length violin plot': results.getboolean('save length violin plot'),
+                'save turning point violin plot': results.getboolean('save turning point violin plot'),
+                'save speed violin plot': results.getboolean('save speed violin plot'),
+                'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),
                 'save displacement violin plot': results.getboolean('save displacement violin plot'),
                 'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
 
                 # _config['LOGGING SETTINGS']
-                'log to file': log_settings.getboolean('log to file'),  # NEW
+                'log to file': log_settings.getboolean('log to file'),
                 'log file path': log_settings.get('log file path'),
                 'shorten displayed logging output': log_settings.getboolean(
                     'shorten displayed logging output'),
                 'shorten logfile logging output': log_settings.getboolean(
-                    'shorten logfile logging output'),  # NEW
+                    'shorten logfile logging output'),
                 'set logging level (debug/info/warning/critical)': set_log_level,
                 'log_level': set_log_level_setting,
                 'verbose': verbose,
@@ -597,13 +613,13 @@ def get_configs(tracking_ini_filepath=None):
                     'include luminosity in tracking calculation'),
                 'color filter': colour_filter,
                 'minimal frame count': adv_video.getint('minimal frame count'),
-                'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),  # __RENAMED__
+                'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),
                 'list save length interval': adv_video.getint('list save length interval'),
 
                 # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
                 'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
                 'maximal empty frames in %': adv_track.getfloat('maximal empty frames in %') / 100 + 1,
-                'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,  # 0 off
+                'percent quantiles excluded area': adv_track.getfloat('percent quantiles excluded area') / 100,
                 'try to omit motility outliers': adv_track.getboolean('try to omit motility outliers'),
                 'stop excluding motility outliers if total count above percent': adv_track.getfloat(
                     'stop excluding motility outliers if total count above percent') / 100,
@@ -615,17 +631,15 @@ def get_configs(tracking_ini_filepath=None):
                 'maximal recursion depth': adv_track.getint('maximal recursion depth'),  # 0 off
                 'limit track length exactly': adv_track.getboolean('limit track length exactly'),
                 'compare angle between n frames': adv_track.getint('compare angle between n frames'),
-                'force tracking.ini fps settings': adv_track.getboolean('force tracking.ini fps settings'),  # NEW
+                'force tracking.ini fps settings': adv_track.getboolean('force tracking.ini fps settings'),
 
                 # _config['HOUSEKEEPING']
-                'last backup': housekeeping.get('last backup'),
                 'previous directory': housekeeping.get('previous directory', fallback='./'),
                 'shut down after analysis': housekeeping.getboolean('shut down after analysis'),
 
                 # _config['TEST SETTINGS']
                 'debugging': test.getboolean('debugging'),
                 'path to test video': test.get('path to test video'),
-                # 'path to test .csv': test.get('path to test .csv'),
             }
             if verbose:
                 logger.debug('tracking.ini settings:')
@@ -779,49 +793,6 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     return queue_listener, return_format
 
 
-def get_any_paths(prev_dir=None, rename=False):
-    logger = logging.getLogger('ei').getChild(__name__)
-    if prev_dir is None:
-        try:
-            prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
-        except configparser.Error:
-            prev_dir = './'
-    filetypes = [
-        ('all files', '.*'),
-        ('csv', '.csv'),
-        ('avi', '.avi'),
-        ('mkv', '.mkv'),
-        ('mov', '.mov'),
-        ('mp4', '.mp4'),
-    ]
-    try:
-        root = Tk()
-        root.overrideredirect(1)  # hide the root window
-        root.withdraw()
-        paths = filedialog.askopenfilenames(
-            title='Choose files. ',
-            filetypes=filetypes,
-            defaultextension='.*',
-            multiple=True,
-            initialdir=prev_dir,
-        )
-    except Exception as ex:
-        template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
-        logger.exception(template.format(type(ex).__name__, ex.args))
-        return None
-    if len(paths) > 0:
-        curr_path = os.path.dirname(paths[0])
-        if rename:
-            try:
-                _config.set('HOUSEKEEPING', 'previous directory', curr_path)
-                with open('tracking.ini', 'w') as configfile:
-                    _config.write(configfile)
-                logger.debug('Previous directory set to {}'.format(curr_path))
-            finally:
-                pass
-    return paths
-
-
 def log_infos(settings, format_for_logging=None):
     """Logging output for several options set in settings.
     :param settings: settings dict from get_configs()
@@ -863,16 +834,14 @@ def log_infos(settings, format_for_logging=None):
     if settings['debugging']:
         logger.warning('Test settings enabled')
     if not cv2.useOptimized():
-        logger.warning('Running cv2 unoptimised')
+        logger.warning('Running cv2 unoptimised; check openCV documentation for help.')
     if not settings['rename previous result .csv']:
         logger.warning('Old .csv result lists will be overwritten')
     if settings['delete .csv file after analysis']:
         logger.warning('Generated .csv files will be deleted after analysis')
-    if settings['select files']:
-        if not settings['debugging']:
-            logger.info('Manually selecting files enabled')
-        else:
-            logger.warning('Manually selecting files disabled due to test setting')
+    if settings['select files'] and settings['debugging']:
+        logger.warning('Manually selecting files disabled due to debugging')
+
     # Infos
     if settings['verbose']:
         logger.info('Verbose enabled, logging set to debug.')
@@ -886,21 +855,26 @@ def log_infos(settings, format_for_logging=None):
         logger.info('Use average luminosity for distance calculation enabled - '
                     'processing time per video may increase notably')
     if settings['limit track length to x seconds']:  # 0 is false; otherwise true
-        logger.info('Maximal track length for evaluation set to {} s'.format(
-            settings['limit track length to x seconds']))
+        limit_track_string = 'Maximal track length for evaluation set to {} s'.format(
+            settings['limit track length to x seconds'])
+        if settings['limit track length exactly']:
+            limit_track_string += ' exactly. Tracks off by any frames will be discarded.'
+        logger.info(limit_track_string)
     else:
         logger.info('Full track length will be used in evaluation')
-    # if settings['maximal video file age (infinite or seconds)'] == np.inf:
-    #     logger.debug('maximal video file age (infinite or seconds) set to infinite')
-    # else:
-    #     logger.debug('maximal video file age (infinite or seconds) set to {}'.format(
-    #         settings['maximal video file age (infinite or seconds)']))
+    if not settings['maximal recursion depth']:
+        logger.info('Tracks will not be split on error as \'maximal recursion depth\' is set to 0. '
+                    'This could severely reduce the number of viable tracks.')
 
     # Debug messages
     logger.debug('White bacteria on dark background set to {}'.format(
         settings['white bacteria on dark background']))
     logger.debug('List save length set to {} entries'.format(settings['list save length interval']))
     logger.debug('Pixel/micrometre: {}'.format(settings['pixel per micrometre']))
+    if settings['verbose']:
+        logger.debug('tracking.ini settings:')
+        for key in settings:
+            logger.debug('{}: {}'.format(key, settings[key]))
     return filler_for_logger
 
 
