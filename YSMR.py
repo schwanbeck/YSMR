@@ -28,6 +28,16 @@ from track_eval import evaluate_tracks, select_tracks, track_bacteria
 
 
 def analyse(path, settings=None, result_folder=None):
+    """
+    Starts analysis function (evaluate_tracks, select_tracks, track_bacteria), depending on received file type.
+    Continues with analysis depending on provided settings.
+
+    :param path: path to file
+    :param settings: tracking.ini settings
+    :type settings: dict
+    :param result_folder: folder to save results in
+    :return: pandas data frame(s), depending on last analysis step
+    """
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)
     if settings is None:
@@ -39,7 +49,7 @@ def analyse(path, settings=None, result_folder=None):
         short_file_output=settings['shorten logfile logging output'],
         log_to_file=settings['log to file']
     )
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     return_value = None
     if result_folder is None:
         result_folder = create_results_folder(path)
@@ -56,7 +66,7 @@ def analyse(path, settings=None, result_folder=None):
         settings['save angle distribution plot / bins'],
         settings['collate results csv to xlsx'],
     ])
-    df, fps, f_height, f_width = [None] * 4
+    df, fps, f_height, f_width, csv_file = [None] * 5
 
     while True:  # so we can break on error
         if '_statistics.csv' in path:  # Already evaluated file
@@ -71,7 +81,7 @@ def analyse(path, settings=None, result_folder=None):
                 logger.warning('Error during video analysis of file {}.'.format(path))
                 return_value = None
                 break
-            (df, fps, f_height, f_width) = track_result
+            (df, fps, f_height, f_width, csv_file) = track_result
             return_value = df
         # if it's not evaluated yet:
         if 'selected_data.csv' not in path and (plots_eval or settings['store processed .csv file']):
@@ -102,6 +112,14 @@ def analyse(path, settings=None, result_folder=None):
         elif 'selected_data.csv' in path:
             logger.warning('No evaluation set to true in settings. Did not evaluate {}'.format(path))
         break  # all is well
+    if settings['delete .csv file after analysis'] and csv_file:
+        try:
+            os.remove(csv_file)
+        except FileNotFoundError:
+            pass
+        except Exception as ex:
+            template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args))
     if return_value:
         end_string = 'Finished with'
     else:
@@ -112,8 +130,23 @@ def analyse(path, settings=None, result_folder=None):
 
 
 def ysmr(settings=None, paths=None):
+    """
+    Starts asynchronous multiprocessing of provided file(s) with analyse().
+
+    :param settings: tracking.ini settings
+    :type settings: dict
+    :param paths: path or iterable with paths
+    :rtype paths: str, list, os.PathLike
+    :return: list of finished paths, list of failed paths
+    :rtype paths_finished: list
+    :rtype paths_failed: list
+    """
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)  # Get settings
+    paths_failed = []
+    paths_finished = []
+    if isinstance(paths, str) or isinstance(paths, os.PathLike):
+        paths = [paths]  # convert to list, otherwise for path in paths iterates over characters in string
     if settings is None:
         sys.exit('Fatal error in retrieving tracking.ini')
     check_logfile(path=settings['log file path'])
@@ -124,13 +157,17 @@ def ysmr(settings=None, paths=None):
         short_file_output=settings['shorten logfile logging output'],
         log_to_file=settings['log to file']
     )
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     filler_for_logger = log_infos(settings=settings, format_for_logging=format_for_logging)
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
         folder_path = os.path.dirname(settings['path to test video'])
         result_folder = create_results_folder(path=folder_path)
-        track_bacteria(settings['path to test video'], settings=settings, result_folder=result_folder)
+        result = analyse(settings['path to test video'], settings=settings, result_folder=result_folder)
+        if result:
+            paths_finished.append(settings['path to test video'])
+        else:
+            paths_failed.append(settings['path to test video'])
 
     else:
         if settings['select files']:
@@ -171,12 +208,13 @@ def ysmr(settings=None, paths=None):
         pool.close()
         pool.join()
 
-        paths_failed = []
         for path, item in results.items():
             try:
                 result = item.get()
                 if result is None:
                     paths_failed.append(path)
+                else:
+                    paths_finished.append(path)
             except Exception as exc:
                 logger.critical('An exception of type {0} occurred with path {1}. Arguments:'.format(
                     type(exc).__name__, path))
@@ -198,9 +236,8 @@ def ysmr(settings=None, paths=None):
         shutdown()
     logger.info('Elapsed time: {}\n{}\n'.format(elapsed_time(t_one), filler_for_logger))
     queue_listener.stop()
-    return
+    return paths_finished, paths_failed
 
 
 if __name__ == '__main__':
     ysmr()
-    sys.exit(0)
