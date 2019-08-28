@@ -145,7 +145,8 @@ class CentroidTracker:
                         # continue jumps back to the beginning of the for-loop
                         continue
                     # @todo: distance check? Currently kicked out in find_good_tracks()/track_eval.py
-                    # @todo: could be done by setting distance_matrix values > max. travel dist. to NaN?
+                    # could be done by setting distance_matrix values > max. travel dist. to NaN?
+
                     # otherwise, grab the object ID for the current row,
                     # set its new centroid, and reset the disappeared counter
                     object_id = object_ids[row]

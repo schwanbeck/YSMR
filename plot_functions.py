@@ -37,7 +37,7 @@ def angle_distribution_plot(df, bins_number, plot_title_name, save_path, dpi=300
     :type dpi: int
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     angle_radians = df['angle_diff']
     # Create array with average motility percentage per track
     average_minimum_groups = df.groupby('TRACK_ID')['minimum']
@@ -99,7 +99,7 @@ def large_xy_plot(df, plot_title_name, save_path, dpi=300):
     :type dpi: int
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
     plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
     plt.grid(True)
@@ -154,7 +154,7 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     :type dpi: int
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if not dist_max:
         try:
             dist_max = df['travelled_dist'].max()
@@ -211,7 +211,7 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
 
 
 def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=None, dpi=300):
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     save_fig = False
     if axis is None:  # in case it's not plotted/saved directly
         fig = plt.figure()

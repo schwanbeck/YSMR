@@ -42,6 +42,7 @@ def bytes_to_human_readable(number_of_bytes):
     Returns string containing bytes, rounded to 1 decimal place,
     with unit prefix as defined by SI.
     For documentation purposes only.
+
     :param number_of_bytes: bytes to convert
     :type number_of_bytes: int
     :return: the readable number as text
@@ -61,12 +62,13 @@ def bytes_to_human_readable(number_of_bytes):
 def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statistics.csv'):
     """
     Saves all available csv files ending in the specified csv_extension into one xlsx
+
     :param path: folder with csv files
     :param save_path: output folder
     :param csv_extension: extension of .csv files
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     try:
         import xlsxwriter
     except ImportError:
@@ -107,10 +109,11 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
 def create_configs(config_filepath=None):
     """
     generates the tracking.ini config file and tries to open it for editing.
+
     :param config_filepath: optional file path
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     # path = os.path.join(os.path.expanduser("~"), '.config/ysmr')
     # import xdg -> ~/$XDG_CONFIG_HOME/ysmr
     # %APPDATA%: path = os.getenv('APPDATA') + ysmr
@@ -255,6 +258,7 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
     """
     Checks if logfile is above specified size and does a rollover if necessary
     If not, checks if file is padded with empty lines and adds some if necessary
+
     :param path: path to logfile
     :param max_size: maximal size of logfile in bytes
     :type max_size: int
@@ -300,10 +304,11 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
 def create_results_folder(path):
     """
     creates a dated result folder in provided path
+
     :param path: path to folder
     :return: path to result folder
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     folder_time = str(strftime('%y%m%d', localtime()))
     dir_form = '{}/{}_Results/'  # @todo: specify results folder
     if isinstance(path, str) or isinstance(path, os.PathLike):
@@ -316,7 +321,7 @@ def create_results_folder(path):
                         'results folder set to {}'.format(os.path.abspath(directory)))
     if not os.path.exists(directory):
         try:
-            _mkdir(directory)
+            make_dir(directory)
             logger.info('Results folder: {}'.format(directory))
         except OSError as makedir_error:
             logger.exception(makedir_error)
@@ -334,6 +339,7 @@ def creation_date(path_to_file):
     See for explanation/source:
     https://stackoverflow.com/a/39501288/1709587
     Accessed last 2019-03-01 13:37:00,101
+
     :param path_to_file: path to file
     :return: time since file creation in seconds
     :rtype: int
@@ -362,6 +368,7 @@ def creation_date(path_to_file):
 def different_tracks(data, column='TRACK_ID'):
     """
     check for changes in column, return lists of starts/stops
+
     :param data: pandas data frame
     :param column: column to be checked for changes
     :return: list of start IDs, list of stop IDs
@@ -382,10 +389,11 @@ def different_tracks(data, column='TRACK_ID'):
 def elapsed_time(time_one):
     """
     rough measure for elapsed time since time_one
+
     :param time_one: start time
     :return: time difference
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     time_two = datetime.now()
     try:
         time_delta = time_two - time_one
@@ -398,6 +406,7 @@ def elapsed_time(time_one):
 def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursive=True):
     """
     Search for files with provided extension in provided path
+
     :param base_path: path which is checked for files
     :param extension: extension or ending of files
     :type extension: str
@@ -408,7 +417,7 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
     :type recursive: bool
     :return: list of files
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if not os.path.exists(base_path):
         logger.warning('Path could not be found: {}'.format(base_path))
         return None
@@ -437,7 +446,8 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
 
 def get_any_paths(prev_dir=None, rename=False, file_types=None):
     """
-    Ask user for file selection.
+    Ask user for file selection with a tkinter askopenfilenames.
+
     :param prev_dir: Folder in which to start search
     :param rename: Whether to rename the previous folder in the config file tracking.ini
     :type rename: bool
@@ -446,7 +456,7 @@ def get_any_paths(prev_dir=None, rename=False, file_types=None):
     :return: list of files
     :rtype: list
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if prev_dir is None:
         try:
             prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
@@ -494,11 +504,12 @@ def get_any_paths(prev_dir=None, rename=False, file_types=None):
 def get_configs(tracking_ini_filepath=None):
     """
     Read tracking.ini, convert values to usable form and return as dict
+
     :param tracking_ini_filepath: filepath for tracking.ini
     :return: configs as dict
     :rtype: dict
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     settings_dict = None
     if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
         settings_dict = tracking_ini_filepath
@@ -664,12 +675,13 @@ def get_configs(tracking_ini_filepath=None):
 def get_data(csv_file_path, dtype=None):
     """
     load csv file to pandas data frame
+
     :param csv_file_path: csv file to read
     :param dtype: dict of columns to be loaded and their data types
     :type dtype: dict
     :return: pandas data frame
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if type(csv_file_path) is not (str or os.PathLike or bytes) and (list or tuple):
         csv_file_path = csv_file_path[0]
         logger.warning('Passed list or tuple argument to get_data(); get_data() only used first argument.')
@@ -720,8 +732,9 @@ def get_data(csv_file_path, dtype=None):
 def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                 short_stream_output=False, short_file_output=False, log_to_file=False):
     """
-    looks if loggers are already set up, creates new ones if they are missing
-    workaround for multiprocessing logging
+    looks if loggers are already set up, creates new ones if they are missing.
+    Workaround for multiprocessing logging.
+
     :param log_level: minimal logging level
     :param logfile_name: file for logging.Filehandler
     :param short_stream_output: shorten the sys.stdout output
@@ -732,13 +745,12 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     :type log_to_file: bool
     :return: logging queue, longest used logging format
     """
-    # The loggers name is "ei". This is german for "egg". There is no good reason for this.
-    logger = logging.getLogger('ei')
+    logger = logging.getLogger('ysmr')
     logger.propagate = False
     # Log message setup
     long_format_logging = '{asctime:}\t' \
-                          '{name:21.21}\t' \
-                          '{funcName:14.14}\t' \
+                          '{name:19.19}\t' \
+                          '{funcName:17.17}\t' \
                           '{lineno:>4}\t' \
                           '{levelname:8.8}\t' \
                           '{process:>5}:\t' \
@@ -795,6 +807,7 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
 
 def log_infos(settings, format_for_logging=None):
     """Logging output for several options set in settings.
+
     :param settings: settings dict from get_configs()
     :type settings: dict
     :param format_for_logging: logging format string
@@ -802,7 +815,7 @@ def log_infos(settings, format_for_logging=None):
     :return: filler for logger
     :rtype: str
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     # Log some general stuff
     if format_for_logging is None:
         format_for_logging = '{asctime:}\t' \
@@ -879,8 +892,8 @@ def log_infos(settings, format_for_logging=None):
 
 
 def logfile_padding(logfile, iteration=0):
-    """
-    pads text file with max. two empty lines if it doesn't have one at the end
+    """pads text file with max. two empty lines if it doesn't have one at the end
+
     :param logfile: path to file
     :param iteration: internal iteration counter
     :return: None
@@ -899,7 +912,7 @@ def logfile_padding(logfile, iteration=0):
         logfile_padding(logfile, iteration=iteration + 1)
 
 
-def _mkdir(new_directory):
+def make_dir(new_directory):
     """works the way a good mkdir should :)
         - already exists, silently complete
         - regular file in the way, raise an exception
@@ -910,6 +923,7 @@ def _mkdir(new_directory):
         Author: Trent Mick
         - https://code.activestate.com/recipes/82465-a-friendly-mkdir/
         Accessed last 2019-06-04 13:37:00,101
+
     :param new_directory: file path to be created
     :return: None
     """
@@ -921,7 +935,7 @@ def _mkdir(new_directory):
     else:
         head, tail = os.path.split(new_directory)
         if head and not os.path.isdir(head):
-            _mkdir(head)
+            make_dir(head)
         if tail:
             os.mkdir(new_directory)
 
@@ -929,6 +943,7 @@ def _mkdir(new_directory):
 def reshape_result(tuple_of_tuples, *args):
     """
     reshape tuple of tuples into (x, y, *args) and (width, height, degrees_orientation)
+
     :param tuple_of_tuples: (x, y), (w, h), degrees_orientation
     :param args: additional parameters are added to coordinates
     :return: (x, y, *args), (width, height, degrees_orientation)
@@ -943,11 +958,12 @@ def reshape_result(tuple_of_tuples, *args):
 def save_df_to_csv(df, save_path):
     """
     save data frame to csv file
+
     :param df: pandas data frame
     :param save_path: path to csv file
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     try:
         old_df_path, old_df_ext = os.path.split(save_path)
         old_csv = '{}/{}.{}'.format(
@@ -977,6 +993,7 @@ def save_df_to_csv(df, save_path):
 def save_list(path, coords=None, first_call=False, rename_old_list=True, illumination=False):
     """
     Create csv file for results from track_bacteria(), append results
+
     :param path: path to video file for first call, path to .csv file otherwise
     :param coords: list of coordinate tuples
     :type coords: list
@@ -988,7 +1005,7 @@ def save_list(path, coords=None, first_call=False, rename_old_list=True, illumin
     :type illumination: bool
     :return: first_call returns old_list string if it existed and .csv file path
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if first_call:  # set up .csv file
         pathname, filename_ext = os.path.split(path)
         filename = os.path.splitext(filename_ext)[0]
@@ -1023,16 +1040,11 @@ def save_list(path, coords=None, first_call=False, rename_old_list=True, illumin
         return old_list, file_csv
 
     if coords:  # Check if we actually received something
-        # @todo: sort coords here to speed up sorting process later?
         string_holder = ''  # Create empty string to which rows are appended
-        illum = 0
         for item in coords:
             # convert tuple first into single parts, then to .csv row
             frame, obj_id, xy, (w, h, deg) = item
-            if not illumination:
-                x, y = xy[:2]  # in case of (x, y, illumination)
-            else:
-                x, y, illum = xy[:3]
+            x, y = xy[:2]  # in case of (x, y, illumination)
             curr_string = '{0},{1},{2},{3},{4},{5},{6}'.format(
                 int(obj_id),  # 0  # Appeared sometimes as float; intercepted here
                 int(frame),  # 1
@@ -1043,7 +1055,7 @@ def save_list(path, coords=None, first_call=False, rename_old_list=True, illumin
                 deg  # 6
             )
             if illumination:
-                curr_string = '{},{}\n'.format(curr_string, illum)
+                curr_string = '{},{}\n'.format(curr_string, xy[2])
             else:
                 curr_string = '{}\n'.format(curr_string)
             string_holder += curr_string  # append row
@@ -1055,10 +1067,11 @@ def save_list(path, coords=None, first_call=False, rename_old_list=True, illumin
 def set_different_colour_filter(colour_filter_new):
     """
     sets a new cv2 colour filter
+
     :param colour_filter_new: name of colour filter
     :return: cv2 colour filter
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     logger.warning('Setting colour filter to {}'.format(colour_filter_new))
     flags = [flag for flag in dir(cv2) if flag.startswith('COLOR_')]  # get all possible flags
     if colour_filter_new.isdigit():
@@ -1087,6 +1100,7 @@ def set_different_colour_filter(colour_filter_new):
 def sort_list(file_path=None, sort=None, df=None, save_file=False):
     """
     sorts pandas data frame, optionally saves it and loads it from csv
+
     :param file_path: file path to save .csv to
     :param sort: list of columns to sort by
     :type sort: list
@@ -1095,7 +1109,7 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
     :type save_file: bool
     :return: sorted pandas data frame
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if sort is None:
         sort = ['TRACK_ID', 'POSITION_T']
     if file_path is not None and df is None:
@@ -1123,11 +1137,12 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
 def shutdown(seconds=60):
     """
     attempts to shut down the computer
+
     :param seconds: seconds before shutdown on windows
     :type seconds: int
     :return: None
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     if os.name is 'nt':  # windows
         try:
             response = subprocess.run('shutdown -f -s -t {}'.format(seconds), stderr=subprocess.PIPE)
@@ -1139,7 +1154,7 @@ def shutdown(seconds=60):
             logger.exception('Error during shutdown: {}'.format(os_shutdown_error))
         finally:
             pass
-    else:  # @todo: untested
+    else:
         try:
             response = subprocess.run('systemctl poweroff', stderr=subprocess.PIPE)
             response.check_returncode()

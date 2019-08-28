@@ -34,14 +34,15 @@ from tracker import CentroidTracker
 
 def track_bacteria(video_path, settings=None, result_folder=None):
     """
-    detect and track bright spots in a video file, saves output to a .csv file
+    Detect and track bright spots in a video file, saves output to a .csv file
+
     :param video_path: path to video file
     :param settings: settings from tracking.ini, will be read if not provided
     :type settings: dict
     :param result_folder: path to result folder
     :return: pandas data frame with results, fps of file, frame width and frame height
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     settings = get_configs(settings)  # Get settings
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
@@ -182,9 +183,12 @@ def track_bacteria(video_path, settings=None, result_folder=None):
             del threshold_list[0]
 
         if curr_frame_count == settings['minimal frame count']:
-            logger.debug('Background threshold level: {} (of 255), '
-                         'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
-                          curr_threshold, mean.item(), stddev.item(), settings['threshold offset for detection']))
+            logger.debug(
+                'Background threshold level: {} (of 255), '
+                'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
+                    curr_threshold, mean.item(), stddev.item(), settings['threshold offset for detection']
+                )
+            )
         # various other tries to optimise threshold:
         # blurred = cv2.bilateralFilter(gray, 3, 75, 75)
         # equ = clahe.apply(gray)  # uncomment clahe above; background removal
@@ -308,12 +312,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                 error_during_read = True
                 logger.error('Processing file interrupted by user: {}'.format(video_path))
                 break
-        # @todo: break_time_seconds from .ini - for partial analysis?
-        # break_time_seconds = 0
-        # if break_time_seconds != 0 and curr_frame_count > (break_time_seconds * fps_of_file):
-        #     logger.debug('Video analysis cancelled early at frame {} ({} sec)'.format(
-        #         curr_frame_count, (break_time_seconds * fps_of_file)))
-        #     break
 
     if coords:  # check if list is not empty ([] == False, otherwise True)
         save_list(coords=coords, path=list_name,
@@ -348,7 +346,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     if error_during_read:
         logger.critical('Error during read, stopping before evaluation. File: {}'.format(video_path))
         return None
-    return df_for_eval, fps_of_file, frame_height, frame_width
+    return df_for_eval, fps_of_file, frame_height, frame_width, list_name
 
 
 def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
@@ -356,6 +354,7 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
     """
     checks multiple attributes for passed track, returns list with
     ok start/stop indexes and lowest reached kick reason
+
     :param df_passed: pandas data frame with tracks
     :param start: start index of track
     :type start: int
@@ -376,7 +375,7 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
     :rtype return_result: list
     :rtype kick_reason: int
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     size = stop - start + 1
     # avoid off-by-one error; used instead of df.shape[0] to avoid impossible calls to df.iloc[:]
     '''
@@ -473,6 +472,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     """
     selection of good tracks from file or data frame according to various parameters
     either file or data frame have to be provided
+
     :param path_to_file: optional path to .csv
     :param df: optional pandas data frame
     :param results_directory: path to results directory
@@ -484,13 +484,11 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     :type settings: dict
     :return: pandas data frame of selected tracks
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     settings = get_configs(settings)  # Get settings
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
         return None
-    # if not any([]):  @todo: if not any() check for total analysis requirements
-    #     return 'No action required.'
     if settings['verbose']:
         logger.debug('Have accepted string {}'.format(path_to_file))
     if path_to_file is None:
@@ -512,12 +510,14 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     settings['minimal length in seconds'] = int(round(fps, 0) * settings['minimal length in seconds'])
     settings['limit track length to x seconds'] = int(round(fps, 0) * settings['limit track length to x seconds'])
     if settings['extreme area outliers lower end in px*px'] >= settings['extreme area outliers upper end in px*px']:
-        logger.critical('Minimal area exclusion in px^2 larger or equal to maximum; will not be able to find tracks. '
-                        'Please update tracking.ini. extreme area outliers lower end in px*px: {}, '
-                        'extreme area outliers upper end in px*px: {}'.format(  # makes no sense to continue
-                         settings['extreme area outliers lower end in px*px'],
-                         settings['extreme area outliers upper end in px*px'])
-                        )
+        logger.critical(
+            'Minimal area exclusion in px^2 larger or equal to maximum; will not be able to find tracks. '
+            'Please update tracking.ini. extreme area outliers lower end in px*px: {}, '
+            'extreme area outliers upper end in px*px: {}'.format(  # makes no sense to continue
+                settings['extreme area outliers lower end in px*px'],
+                settings['extreme area outliers upper end in px*px']
+            )
+        )
         return None
     if frame_width is None or frame_height is None:
         logger.debug('Retrieving frame width/height from tracking.ini.')
@@ -541,9 +541,12 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         logger.critical('Error reading data frame from file {}'.format(path_to_file))
         return None
     if df.shape[0] < settings['minimal length in seconds']:
-        logger.critical('File is empty/of insufficient length before initial clean-up. '
-                        'Minimal size (frames): {}, length: {}, path: {}'.format(
-                         settings['minimal length in seconds'], df.shape[0], path_to_file))
+        logger.critical(
+            'File is empty/of insufficient length before initial clean-up. '
+            'Minimal size (frames): {}, length: {}, path: {}'.format(
+                settings['minimal length in seconds'], df.shape[0], path_to_file
+            )
+        )
         return None
     _, track_change = different_tracks(df)  # different_tracks returns [starts], [stops]
     initial_length, initial_size = (len(track_change), df.shape[0])
@@ -606,9 +609,12 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         logger.debug('Re-indexing')
     df.reset_index(drop=True, inplace=True)
     if df.shape[0] < settings['minimal length in seconds']:
-        logger.warning('File is empty/of insufficient length after initial clean-up. '
-                       'Minimal size: {}, length: {}, path: {}'.format(
-                        settings['minimal length in seconds'], df.shape[0], path_to_file))
+        logger.warning(
+            'File is empty/of insufficient length after initial clean-up. '
+            'Minimal size: {}, length: {}, path: {}'.format(
+                settings['minimal length in seconds'], df.shape[0], path_to_file
+            )
+        )
         return None
     track_start, track_change = different_tracks(df)  # as we've dropped rows, this needs to be calculated again
     logger.info(
@@ -649,11 +655,15 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
                     ''.format(q1_dist, q3_dist, distance_outlier, df['distance'].sum(), distance_outlier_percents))
 
         if distance_outlier_percents > settings['stop excluding motility outliers if total count above percent']:
-            logger.warning('Motility outliers more than {:.2%} of all data points ({:.2%}); recommend to '
-                           're-analyse file with outlier removal changed if upper quartile is especially low'
-                           '(Quartile: {:.3f})'.format(
-                            settings['stop excluding motility outliers if total count above percent'],
-                            distance_outlier_percents, q3_dist))
+            logger.warning(
+                'Motility outliers more than {:.2%} of all data points ({:.2%}); recommend to '
+                're-analyse file with outlier removal changed if upper quartile is especially low'
+                '(Quartile: {:.3f})'.format(
+                    settings['stop excluding motility outliers if total count above percent'],
+                    distance_outlier_percents,
+                    q3_dist
+                )
+            )
             logger.info('Distance outlier exclusion switched off due to too many outliers')
             df['distance'] = np.zeros(df.shape[0], dtype=np.int8)
     else:
@@ -763,16 +773,13 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     save_path = '{}{}'.format(results_directory, file_name) + '_{}{}'
     if settings['store processed .csv file']:
         save_df_to_csv(df=df, save_path=save_path.format('selected_data', '.csv'))
-    """
-    return evaluate_tracks(path_to_file=path_to_file, results_directory=results_directory,
-                           df=df, settings=settings, fps=fps)
-    """
     return df
 
 
 def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps=None, ):
     """
     calculate additional info from provided .csv/data frame
+
     :param path_to_file: .csv file
     :param results_directory: path to results directory
     :param df: optional pandas data frame
@@ -780,10 +787,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     :type settings: dict
     :param fps: frame per second value
     :type fps: float
-    :return: string
-    :rtype: str
+    :return: modified df, statistics as pandas data frame
     """
-    logger = logging.getLogger('ei').getChild(__name__)
+    logger = logging.getLogger('ysmr').getChild(__name__)
     settings = get_configs(settings)  # Get settings
     if settings is None:
         logger.critical('No settings provided / could not get settings for start_it_up().')
@@ -980,10 +986,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         prediction = 'Immotile'
     else:
         prediction = 'Mixture of motile and immotile cells'
-    logger.debug('Motile: {:.2%} Twitching: {:.2%} Median % molility: {:.2%} '
-                 'q3 % motility: {:.2%}, prediction: {}'.format(
-        motile, twitching, median_perc_motility, q3_perc_motility, prediction  # @todo: fix predictions
-    ))
+    logger.debug(
+        'Motile: {:.2%} Twitching: {:.2%} Median % molility: {:.2%} '
+        'q3 % motility: {:.2%}, prediction: {}'.format(
+            motile, twitching, median_perc_motility, q3_perc_motility, prediction
+        )  # @todo: fix predictions
+    )
     q1_time, q2_time, q3_time = np.quantile(df_stats[name_of_columns[3]], (0.25, 0.5, 0.75))  # 'Time (s)',  # 3
     logger.debug('Time duration of selected tracks min: {:.3f}, max: '
                  '{:.3f}, Quantiles (25/50/75%): {:.3f}, {:.3f}, {:.3f}'
@@ -1009,7 +1017,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             if i > 1:
                 logger.info('Violin plots are set to \'perc. motile\', but \'split violin plots on\' contains values '
                             'larger than 1. Values have been divided by 100 for use as percentages.')
-                cut_off_list = [i/100 for i in cut_off_list]
+                cut_off_list = [i / 100 for i in cut_off_list]
                 break
 
     name_all_categories = 'All'
@@ -1102,4 +1110,4 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
-    return end_string
+    return df, df_stats
