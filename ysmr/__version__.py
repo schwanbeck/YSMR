@@ -8,6 +8,6 @@
    #     ####   ####       ####  #      ### #    #     #    # ######        #    #  ####   ####  #    # #####
 or YoghurtYetis Software for Motility Recognition
 """
-VERSION = (0, 0, 2)
+VERSION = (0, 0, 3)
 
 __version__ = '.'.join(map(str, VERSION))

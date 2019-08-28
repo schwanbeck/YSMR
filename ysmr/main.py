@@ -22,9 +22,9 @@ import sys
 from datetime import datetime
 from time import sleep
 
-from helper_file import (check_logfile, collate_results_csv_to_xlsx, create_results_folder, elapsed_time, get_any_paths,
-                         get_configs, get_loggers, log_infos, shutdown)
-from track_eval import evaluate_tracks, select_tracks, track_bacteria
+from ysmr.helper_file import (check_logfile, collate_results_csv_to_xlsx, create_results_folder, elapsed_time,
+                              get_any_paths, get_configs, get_loggers, log_infos, shutdown)
+from ysmr.track_eval import evaluate_tracks, select_tracks, track_bacteria
 
 
 def analyse(path, settings=None, result_folder=None):
@@ -194,7 +194,7 @@ def ysmr(settings=None, paths=None):
                 if event[0].lower() == 'n':
                     logger.info('Process aborted.\n')
                     queue_listener.stop()
-                    sys.exit('Process aborted.')
+                    sys.exit(1)
                 elif event[0].lower() == 'y':
                     logger.debug('User has given it\'s blessing.')
                     break
