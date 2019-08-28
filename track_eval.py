@@ -479,7 +479,9 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     :param fps: frame per second value
     :type fps: float
     :param frame_height: frame height
+    :rtype frame_height: int
     :param frame_width: frame width
+    :rtype frame_width: int
     :param settings: tracking.ini settings
     :type settings: dict
     :return: pandas data frame of selected tracks
