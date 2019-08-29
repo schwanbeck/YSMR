@@ -167,6 +167,7 @@ def create_configs(config_filepath=None):
         'save speed violin plot': True,
         'save angle distribution plot / bins': 36,
         'save displacement violin plot': True,
+        'save percent motile plot': True,
         'collate results csv to xlsx': True,
     }
 
@@ -248,8 +249,7 @@ def create_configs(config_filepath=None):
         sys.exit('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
 
 
-# Check tracking.ini
-# @todo: change tracking.ini file location to something sane
+# Check tracking.ini / create it
 TRACKING_INI_FILEPATH = os.path.join(os.path.abspath('./'), 'tracking.ini')
 if not os.path.isfile(TRACKING_INI_FILEPATH):  # needed by later functions
     create_configs(config_filepath=TRACKING_INI_FILEPATH)
@@ -608,6 +608,7 @@ def get_configs(tracking_ini_filepath=None):
                 'save speed violin plot': results.getboolean('save speed violin plot'),
                 'save angle distribution plot / bins': results.getint('save angle distribution plot / bins'),
                 'save displacement violin plot': results.getboolean('save displacement violin plot'),
+                'save percent motile plot': results.getboolean('save percent motile plot'),
                 'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
 
                 # _config['LOGGING SETTINGS']
@@ -674,13 +675,15 @@ def get_configs(tracking_ini_filepath=None):
     return settings_dict
 
 
-def get_data(csv_file_path, dtype=None):
+def get_data(csv_file_path, dtype=None, check_sorted=True):
     """
     load csv file to pandas data frame
 
     :param csv_file_path: csv file to read
     :param dtype: dict of columns to be loaded and their data types
     :type dtype: dict
+    :param check_sorted: check if df is sorted by TRACK_ID / POSITION_T if available
+    :type check_sorted: bool
     :return: pandas data frame
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
@@ -724,8 +727,10 @@ def get_data(csv_file_path, dtype=None):
         logger.exception(makedir_error)
         return None
     # rough check if file is sorted
-    if all(x in use_cols for x in ['TRACK_ID', 'POSITION_T']):
-        if df.loc[:5, 'TRACK_ID'].is_monotonic:
+    if all(x in use_cols for x in ['TRACK_ID', 'POSITION_T']) and check_sorted:
+        series_check_sorted = df.loc[:5, 'TRACK_ID']
+        if series_check_sorted.is_unique:
+            logger.info('The data frame seems not to be sorted by \'TRACK_ID\' and \'POSITION_T\', sorting now.')
             df = sort_list(df=df, save_file=False)
     logger.debug('Done reading {} into data frame'.format(csv_file_path))
     return df
@@ -751,13 +756,13 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     logger.propagate = False
     # Log message setup
     long_format_logging = '{asctime:}\t' \
-                          '{name:19.19}\t' \
-                          '{funcName:17.17}\t' \
+                          '{funcName:15.15}\t' \
                           '{lineno:>4}\t' \
                           '{levelname:8.8}\t' \
                           '{process:>5}:\t' \
                           '{message}'
-    # '{filename:18:18}\t' \
+    # '{name:19.19}\t' \  # logger name
+    # '{filename:18:18}\t' \  # file name
     short_format_logging = '{asctime:}\t' \
                            '{levelname:8.8}\t' \
                            '{process:>5}:\t' \
@@ -1115,17 +1120,15 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
     logger = logging.getLogger('ysmr').getChild(__name__)
     if sort is None:
         sort = ['TRACK_ID', 'POSITION_T']
+    elif isinstance(sort, (str, bytes)):
+        sort = [sort]
     if file_path is not None and df is None:
-        df = get_data(file_path)  # get data frame from .csv
+        df = get_data(file_path, check_sorted=False)  # get data frame from .csv
         logger.debug('Sorting list {}'.format(file_path))
-    if not isinstance(df, pd.core.frame.DataFrame):
-        error_msg = 'No/wrong arguments passed to sort_list(): file_path: {}, sort: {}, df: {} save_file: {}'.format(
-            file_path, sort, type(df), save_file)
-        logger.critical(error_msg)
-        return None
     try:
         df.sort_values(by=sort, inplace=True, na_position='first')  # Sort data frame
         df.reset_index(drop=True, inplace=True)  # reset index of df
+        logger.debug('Sorted data frame by {}.'.format(sort[0]))
     except Exception as ex:
         template = 'An exception of type {0} occurred while sorting file {2}. Arguments:\n{1!r}'
         logger.exception(template.format(type(ex).__name__, ex.args, file_path))

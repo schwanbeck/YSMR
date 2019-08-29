@@ -170,6 +170,9 @@ newly generated when missing or if it cannot be loaded correctly.
     + When set to true a violin plot of the maximal distance between all measured positions of each bacterium will be
     generated.
     + Accepts 'True' or 'False'.
++ save percent motile plot : True
+    + When set to true a violin plot of the percentage of time where the bacterium was motile will be generated.
+    + Accepts 'True' or 'False'.
 + collate results csv to xlsx: True
 	+ When set to true, tries to collate all files ending in _statistics.csv in the generated results folder into one
 	.xlsx file. 

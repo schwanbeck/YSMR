@@ -34,13 +34,13 @@ from ysmr.tracker import CentroidTracker
 
 def track_bacteria(video_path, settings=None, result_folder=None):
     """
-    Detect and track bright spots in a video file, saves output to a .csv file
+    Detect and track bright spots in a video file, save output to a .csv file
 
     :param video_path: path to video file
     :param settings: settings from tracking.ini, will be read if not provided
     :type settings: dict
     :param result_folder: path to result folder
-    :return: pandas data frame with results, fps of file, frame width and frame height
+    :return: pandas data frame with results, fps of file, frame width, frame height, path to .csv file
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
     settings = get_configs(settings)  # Get settings
@@ -176,7 +176,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         # Non-moving-average version:
         # curr_threshold = int(total_threshold / (curr_frame_count + 1))  # average input  - skip_frames
 
-        # 5 s moving average with list:
+        # 5 s moving average:
         threshold_list.append(curr_frame_threshold)
         curr_threshold = int(sum(threshold_list) / len(threshold_list))
         if len(threshold_list) > fps_of_file * 5:
@@ -247,7 +247,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                 # at distances < 2.56 px; thereby hopefully helping miss-assignment after overlap
                 # at least that's the intention
                 rects.append(reshape_result(reichtangle, reichtangle_mean))
-                # tracker.py has been remodelled to adaptively take n dimensions for distance matrix
+                # tracker.py has been changed to adaptively take n dimensions for distance matrix
             else:
                 rects.append(reshape_result(reichtangle))
                 # reshape_result(tuple_of_tuples) returns ((x, y[, *args]), (w, h, degrees_orientation))
@@ -260,7 +260,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
 
         for index, (objectID, centroid) in enumerate(objects.items()):  # object.items() loop
             # Follow the KISS principle (fancy smoother option is surely available, but this works):
-            # Append results to list (Frame, ID, x, y, (other values))
+            # Append results to list (Frame, ID, x, y, (other values)), save list when it gets too long
             coords.append((curr_frame_count, objectID, centroid, wh_degrees[objectID]))
 
             # draw both the ID of the object and the center point
@@ -287,7 +287,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         # Change coords.list if it is long enough (I/O-operations are time consuming)
         if len(coords) >= settings['list save length interval']:
             # shift this block into previous for-loop if too many objects per frame causes problems
-            # change list_save_length in tracking.ini if current value is an issue.
+            # change save length value in tracking.ini if current value is an issue.
             # send coords off to be saved on drive:
             save_list(coords=coords, path=list_name,
                       illumination=settings['include luminosity in tracking calculation'])
@@ -430,12 +430,12 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary,
                                     kick_reason -= 1
                                     # everything is as it should be, append start/stop to return_result
                                     return_result.append((start, stop))
-            # Halve track into part before/after outlier; try to analyze those instead; extend return_result
+            # Split track into part before/after outlier; try to analyze those instead; extend return_result
             else:
                 # Hole is index where distance_outlier == 1; hole is excluded
                 idx_outlier = df['distance'].idxmax()
                 sub_part.extend([(start, idx_outlier - 1), (idx_outlier + 1, stop)])
-        # Halve track into part before/after hole; try to analyze those instead; extend return_result
+        # Split track into part before/after hole; try to analyze those instead; extend return_result
         else:
             # Hole is index of largest number in df['POSITION_T'].diff()
             idx_hole = look_for_holes.idxmax()
@@ -915,12 +915,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     time_series = (time_series + 1) / fps  # off-by-one error
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
     motile_total_series = df.groupby('TRACK_ID')['minimum'].agg('sum')
-    motile_series = (motile_total_series / df.groupby('TRACK_ID')['t_norm'].agg('last'))
+    motile_series = (motile_total_series / time_series)
     acr_series = np.sqrt(
         np.square(df.groupby('TRACK_ID')['x_norm'].agg('last')) +
         np.square(df.groupby('TRACK_ID')['y_norm'].agg('last'))
     )
-    # time, curr_track_null_points_per_s, distance, speed, displacement
     speed_series = pd.Series(
         (np.where(motile_total_series != 0,
                   dist_series / time_series,
@@ -1096,8 +1095,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         violin_plots.append((name_of_columns[3], 'time_plot'))
     if settings['save displacement violin plot']:
         violin_plots.append((name_of_columns[4], 'displacement'))
-    # if settings['percent motile']:
-    #     violin_plots.append((name_of_columns[5], '% motile'))
+    if settings['save percent motile plot']:
+        violin_plots.append((name_of_columns[5], 'perc_motile'))
     if settings['save acr violin plot']:
         violin_plots.append((name_of_columns[6], 'arc-chord_ratio'))
 
@@ -1112,4 +1111,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
+    track_start, track_change = different_tracks(df)
+
+    save_df_to_csv(df=df.loc[track_start[-5]:,
+                      ['TRACK_ID', 't_norm', 'travelled_dist', 'minimum', 'angle_diff', 'turn_points', ]
+                      ], save_path=save_path.format('TEST', '.csv'))
     return df, df_stats

@@ -112,6 +112,7 @@ def analyse(path, settings=None, result_folder=None):
         elif 'selected_data.csv' in path:
             logger.warning('No evaluation set to true in settings. Did not evaluate {}'.format(path))
         break  # all is well
+
     if settings['delete .csv file after analysis'] and csv_file:
         try:
             os.remove(csv_file)
@@ -129,17 +130,16 @@ def analyse(path, settings=None, result_folder=None):
     return return_value
 
 
-def ysmr(settings=None, paths=None):
+def ysmr(paths=None, settings=None):
     """
     Starts asynchronous multiprocessing of provided file(s) with analyse().
 
     :param settings: tracking.ini settings
     :type settings: dict
     :param paths: path or iterable with paths
-    :rtype paths: str, list, os.PathLike
-    :return: list of finished paths, list of failed paths
+    :type paths: str, list, os.PathLike
+    :return: list of (finished path, results)
     :rtype paths_finished: list
-    :rtype paths_failed: list
     """
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)  # Get settings
@@ -213,8 +213,9 @@ def ysmr(settings=None, paths=None):
                 result = item.get()
                 if result is None:
                     paths_failed.append(path)
+                    paths_finished.append((path, None))
                 else:
-                    paths_finished.append(path)
+                    paths_finished.append((path, item))
             except Exception as exc:
                 logger.critical('An exception of type {0} occurred with path {1}. Arguments:'.format(
                     type(exc).__name__, path))
@@ -222,6 +223,7 @@ def ysmr(settings=None, paths=None):
                     logger.critical('{}'.format(line))
                 logger.exception(exc)
                 paths_failed.append(path)
+                paths_finished.append((path, None))
                 continue
         if paths_failed:
             logger.critical('Failed to analyse {} of {} file(s):'.format(len(paths_failed), len(paths)))
@@ -236,7 +238,7 @@ def ysmr(settings=None, paths=None):
         shutdown()
     logger.info('Elapsed time: {}\n{}\n'.format(elapsed_time(t_one), filler_for_logger))
     queue_listener.stop()
-    return paths_finished, paths_failed
+    return paths_finished
 
 
 if __name__ == '__main__':
