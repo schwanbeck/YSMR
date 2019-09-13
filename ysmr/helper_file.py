@@ -183,7 +183,6 @@ def create_configs(config_filepath=None):
     _config['ADVANCED VIDEO SETTINGS'] = {
         'include luminosity in tracking calculation': False,
         'color filter': 'COLOR_BGR2GRAY',
-        'minimal video file age in seconds': 0,
         'minimal frame count': 600,
         'stop evaluation on error': True,
         'list save length interval': 10000,
