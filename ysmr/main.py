@@ -143,12 +143,12 @@ def ysmr(paths=None, settings=None):
     """
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)  # Get settings
+    if settings is None:
+        sys.exit('Fatal error in retrieving tracking.ini')
     paths_failed = []
     paths_finished = []
     if isinstance(paths, str) or isinstance(paths, os.PathLike):
         paths = [paths]  # convert to list, otherwise for path in paths iterates over characters in string
-    if settings is None:
-        sys.exit('Fatal error in retrieving tracking.ini')
     check_logfile(path=settings['log file path'])
     queue_listener, format_for_logging = get_loggers(
         log_level=settings['log_level'],

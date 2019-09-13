@@ -871,7 +871,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     # travelled_distance = square root(delta_x^2 + delta_y^2) / px to micrometre ratio
     df['travelled_dist'] = np.sqrt(np.square(df['x_delta']) + np.square(df['y_delta'])) / px_to_micrometre
-    # np.put(df['travelled_dist'], diff_tracks_start, 0)
     df['minimum'] = df['travelled_dist'] / df['t_delta']
     # get rid of rounding errors, convert to binary:
     df['minimum'] = np.where(df['minimum'] > 10 ** -3, 1, 0).astype(np.int8)
@@ -912,10 +911,10 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # Get largest displacement during track
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
     time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
+    motile_total_series = df.groupby('TRACK_ID')['minimum'].agg('sum')
+    motile_series = motile_total_series / (time_series + 1)  # off-by-one error
     time_series = (time_series + 1) / fps  # off-by-one error
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
-    motile_total_series = df.groupby('TRACK_ID')['minimum'].agg('sum')
-    motile_series = (motile_total_series / time_series)
     acr_series = np.sqrt(
         np.square(df.groupby('TRACK_ID')['x_norm'].agg('last')) +
         np.square(df.groupby('TRACK_ID')['y_norm'].agg('last'))
@@ -924,13 +923,13 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         (np.where(motile_total_series != 0,
                   dist_series / time_series,
                   0)), index=time_series.index)
+    # Avoid div. by 0:
     acr_series = pd.Series(
         (np.where(dist_series != 0,
                   acr_series / dist_series,
                   0
                   )), index=time_series.index)
     turn_percent_series = df.groupby('TRACK_ID')['turn_points'].agg('sum')
-    # Avoid div. by 0:
     turn_percent_series = pd.Series(
         (np.where(motile_total_series != 0,
                   turn_percent_series / motile_total_series,
@@ -1111,9 +1110,4 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     end_string = 'Done evaluating file {}'.format(file_name)
     logging.info(end_string)
-    track_start, track_change = different_tracks(df)
-
-    save_df_to_csv(df=df.loc[track_start[-5]:,
-                      ['TRACK_ID', 't_norm', 'travelled_dist', 'minimum', 'angle_diff', 'turn_points', ]
-                      ], save_path=save_path.format('TEST', '.csv'))
     return df, df_stats
