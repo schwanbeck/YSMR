@@ -18,30 +18,43 @@ Optional:
 + XlsxWriter
 
 #### Files in this package:
-+ \_\_init\_\_.py
-    + empty
-+ \_\_version\_\_.py
-    + version file
-+ helper_file.py
-    + contains various functions used throughout YSMR
++ ysmr/
+    + \_\_init\_\_.py
+        + empty
+    + \_\_version\_\_.py
+        + version file
+    + helper_file.py
+        + contains various functions used throughout YSMR
+    + main.py
+        + File with main functions of YSMR, namely ysmr() and analyse()
+    + plot_functions.py
+        + plotting functions which are used to create graphs
+    + track_eval.py
+        + tracking, selection, and evaluation functions of YSMR
+    + tracker.py
+        + the tracker used by YSMR
++ .gitignore
+    + Gitignore file
 + LICENSE
     + The license under which YSMR is published
-+ plot_functions.py
-    + plotting functions which are used to create graphs
-+ REAMDE.md
++ README.md
     + this file
-+ track_eval.py
-    + tracking, selection, and evaluation functions of YSMR
-+ tracker.py
-    + the tracker used by YSMR
 + YSMR.py
-    + The file which starts YSMR
+    + the file which starts YSMR
 
 ## Usage
 
+When first executed, ysmr() will set up a tracking.ini file, which it will then open and stop executing. We advise that 
+you test the program afterwards with an example video to check basic functionality. Afterwards, you should go through 
+the tracking.ini file and update the values for 'pixel per micrometre', 'frames per second', 'frame width', 
+'frame height' and 'rod shaped bacteria' before using it with your own video files. You will then see if further tweaks 
+are needed.
+
 ## Explanation of tracking.ini file
 Explanation of each setting in the tracking.ini file and the initial default setting. The tracking.ini file will be 
-newly generated when missing or if it cannot be loaded correctly.
+newly generated when missing or if it cannot be loaded correctly. The location of the file is assumed to be in the 
+folder in which a script using ysmr() is executed, but ysmr() can take the location of the tracking.ini file as an 
+optional argument.
 
 ##### BASIC RECORDING SETTINGS
 + pixel per micrometre : 1.41888781
@@ -111,12 +124,14 @@ newly generated when missing or if it cannot be loaded correctly.
 + select files : True
 	+ When set to True, the user will be prompted to select files in a folder which will be used for analysis. 
 	When set to False, the path specified under test settings: 'path to test video' will be used.
+	In any case, if ysmr() is called with file(s) as an optional argument, these will be used.
 	+ Accepts 'True' or 'False'.
 + display video analysis : True
 	+ When set to True, the video analysis process will be displayed in a window.
 	+ Accepts 'True' or 'False'.
 + save video : False
-	+ When set to True, the video analysis process will be saved in the same folder as the original video file.
+	+ When set to True, selected tracks will be annotated in the original video.
+	+ This can only be performed when ysmr() starts out with a video file and not with an already processed .csv file.
 	+ Accepts 'True' or 'False'.
 
 ##### RESULTS SETTINGS
@@ -135,6 +150,10 @@ newly generated when missing or if it cannot be loaded correctly.
 	+ When set to True, generated .csv files containing general track statistics will be saved in result folder after 
 	analysis.
 	+ Accepts 'True' or 'False'.
++ store final analysed .csv file : True
+    + When set to True, processed tracking result .csv files containing selected tracks with calculated additional 
+    information will be saved in result folder after analysis.
+    + Accepts 'True' or 'False'.
 + split results by (turn points / distance / speed / time / displacement / perc. motile) : perc. motile
     + By which sub-category the generated violin plots should be split. The total will always be displayed.
     + Accepts 'turn points', 'distance', 'speed', 'time', 'displacement', and 'perc. motile'.
@@ -217,6 +236,13 @@ newly generated when missing or if it cannot be loaded correctly.
 + list save length interval : 10000
 	+ Minimal length of tracking result object list before it will be stored on disc.
 	+ Accepts an integer value.
++ save video file extension : .mp4
+    + Specifies the file extension used when 'save video' is set to True.
+    + Accepts a string.
++ save video fourcc codec : mp4v
+    + Specifies the four character code video codec used when 'save video' is set to True.
+    + Possible codecs can be looked up at: http://www.fourcc.org/codecs.php
+    + Accepts a string.
 
 ##### ADVANCED TRACK DATA ANALYSIS SETTINGS
 + maximal consecutive holes : 5

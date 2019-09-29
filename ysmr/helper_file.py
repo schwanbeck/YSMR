@@ -32,8 +32,41 @@ from tkinter import filedialog, Tk
 import cv2
 import numpy as np
 import pandas as pd
+from scipy.signal import argrelextrema
 
 _config = configparser.ConfigParser(allow_no_value=True)
+
+
+def argrelextrema_groupby(group, comparator=np.greater_equal, order=10, shift_range=4, fill_value=0):
+    """
+    Find local minima/maxima in range of order (depending on comparator).
+    When shift is not 0, will only return one result in range of shift.
+    Returns array with non-extrema replaced by fil_value
+
+    :param group: array like
+    :param comparator: numpy comparator or equivalent
+    :param order: range in which to check for extrema
+    :type order: int
+    :param shift_range: range in which to exclude multiple results (0 is off).
+    :type shift_range: int
+    :param fill_value: fill value for array
+    :return: group minima/maxima
+    :rtype: pd.Series
+    """
+    group_intermediate = group.to_numpy()
+    result = np.zeros(group.shape[0], dtype=np.int8)
+    np.put(result, argrelextrema(group_intermediate, comparator, order=order)[0], 1)
+    if shift_range:
+        result_comp = result
+        for d_shift in range(-1, -(shift_range + 1)):
+            query = shift_np_array(result_comp, d_shift, 0)
+            result = np.where((
+                (result == 1) &
+                (query == 1),
+                0, result))
+    result = np.where(result == 1, group_intermediate, fill_value)
+    result = pd.Series(result, index=group.index)
+    return result
 
 
 def bytes_to_human_readable(number_of_bytes):
@@ -120,7 +153,8 @@ def create_configs(config_filepath=None):
     if config_filepath is None:
         config_filepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
     try:
-        old_tracking_ini = '{}.{}'.format(config_filepath, datetime.now().strftime('%y%m%d%H%M%S'))
+        config_path_root, config_file_ext = os.path.splitext(config_filepath)
+        old_tracking_ini = '{}_{}{}'.format(config_path_root, datetime.now().strftime('%y%m%d%H%M%S'), config_file_ext)
         os.rename(config_filepath, old_tracking_ini)
         logger.warning('Old tracking.ini renamed to {}'.format(old_tracking_ini))
     except FileNotFoundError:
@@ -156,6 +190,7 @@ def create_configs(config_filepath=None):
         'delete .csv file after analysis': False,
         'store processed .csv file': True,
         'store generated statistical .csv file': True,
+        'store final analysed .csv file': True,
         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)': 'perc. motile',
         'split violin plots on': '0.0, 20.0, 40.0, 60.0, 80.0, 100.0',
         'save large plots': True,
@@ -186,6 +221,8 @@ def create_configs(config_filepath=None):
         'minimal frame count': 600,
         'stop evaluation on error': True,
         'list save length interval': 10000,
+        'save video file extension': '.mp4',
+        'save video fourcc codec': 'mp4v',
     }
 
     _config['ADVANCED TRACK DATA ANALYSIS SETTINGS'] = {
@@ -249,10 +286,10 @@ def create_configs(config_filepath=None):
 
 
 # Check tracking.ini / create it
-TRACKING_INI_FILEPATH = os.path.join(os.path.abspath('./'), 'tracking.ini')
-if not os.path.isfile(TRACKING_INI_FILEPATH):  # needed by later functions
-    create_configs(config_filepath=TRACKING_INI_FILEPATH)
-_config.read(TRACKING_INI_FILEPATH)
+# TRACKING_INI_FILEPATH = os.path.join(os.path.abspath('./'), 'tracking.ini')
+# if not os.path.isfile(TRACKING_INI_FILEPATH):  # needed by later functions
+#     create_configs(config_filepath=TRACKING_INI_FILEPATH)
+# _config.read(TRACKING_INI_FILEPATH)
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
@@ -310,16 +347,16 @@ def create_results_folder(path):
     :return: path to result folder
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
-    folder_time = str(strftime('%y%m%d', localtime()))
-    dir_form = '{}/{}_Results/'  # @todo: specify results folder
+    dir_form = '{}_Results/'.format(str(strftime('%y%m%d', localtime())))
     if isinstance(path, str) or isinstance(path, os.PathLike):
-        directory = dir_form.format(os.path.dirname(path), folder_time)
+        pass
     elif isinstance(path, list) or isinstance(path, tuple):
-        directory = dir_form.format(os.path.dirname(path[0]), folder_time)
+        path = path[0]
     else:
-        directory = dir_form.format('.', folder_time)
+        path = './'
         logger.critical('Could not access base path in path to files; '
-                        'results folder set to {}'.format(os.path.abspath(directory)))
+                        'results folder created in {}'.format(os.path.abspath(path)))
+    directory = os.path.abspath(os.path.join(os.path.dirname(path), dir_form))
     if not os.path.exists(directory):
         try:
             make_dir(directory)
@@ -445,19 +482,21 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
     return out_files
 
 
-def get_any_paths(prev_dir=None, rename=False, file_types=None):
+def get_any_paths(prev_dir=None, rename=False, file_types=None, settings=None):
     """
     Ask user for file selection with a tkinter askopenfilenames.
 
     :param prev_dir: Folder in which to start search
     :param rename: Whether to rename the previous folder in the config file tracking.ini
     :type rename: bool
-    :param file_types: Optional list of file extensions which can be included,
-        first extension will be used as default
+    :param file_types: Optional list of file extensions which can be included, first extension will be used as default
+    :param settings: tracking.ini settings
     :return: list of files
     :rtype: list
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
+    settings = get_configs(settings)
+    _config.read(settings['tracking_ini_filepath'])
     if prev_dir is None:
         try:
             prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
@@ -491,10 +530,10 @@ def get_any_paths(prev_dir=None, rename=False, file_types=None):
         curr_path = os.path.dirname(paths[0])
         try:
             _config.set('HOUSEKEEPING', 'previous directory', curr_path)
-            with open(TRACKING_INI_FILEPATH, 'w') as configfile:
+            with open(settings['tracking_ini_filepath'], 'w') as configfile:
                 _config.write(configfile)
             logger.debug('Previous directory set to {}'.format(curr_path))
-        except (PermissionError, configparser.Error):
+        except (PermissionError, configparser.Error, FileNotFoundError):
             pass
         except Exception as ex:
             template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
@@ -515,8 +554,13 @@ def get_configs(tracking_ini_filepath=None):
     if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
         settings_dict = tracking_ini_filepath
     else:
-        if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
-            _config.read(tracking_ini_filepath)
+        # if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
+        #     _config.read(tracking_ini_filepath)
+        if tracking_ini_filepath is None:
+            # tracking_ini_filepath = TRACKING_INI_FILEPATH
+            tracking_ini_filepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
+        tracking_ini_filepath = os.path.abspath(tracking_ini_filepath)
+        _config.read(tracking_ini_filepath)
         try:
             # try to get all configs
             basic_recording = _config['BASIC RECORDING SETTINGS']
@@ -593,6 +637,7 @@ def get_configs(tracking_ini_filepath=None):
                 'store processed .csv file': results.getboolean('store processed .csv file'),
                 'store generated statistical .csv file': results.getboolean(
                     'store generated statistical .csv file'),
+                'store final analysed .csv file': results.getboolean('store final analysed .csv file'),
                 'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)':
                     results.get(
                         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)'
@@ -628,6 +673,8 @@ def get_configs(tracking_ini_filepath=None):
                 'minimal frame count': adv_video.getint('minimal frame count'),
                 'stop evaluation on error': adv_video.getboolean('stop evaluation on error'),
                 'list save length interval': adv_video.getint('list save length interval'),
+                'save video file extension': adv_video.get('save video file extension'),
+                'save video fourcc codec': adv_video.get('save video fourcc codec'),
 
                 # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
                 'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
@@ -653,6 +700,9 @@ def get_configs(tracking_ini_filepath=None):
                 # _config['TEST SETTINGS']
                 'debugging': test.getboolean('debugging'),
                 'path to test video': test.get('path to test video'),
+
+                # Internal
+                'tracking_ini_filepath': tracking_ini_filepath,
             }
             if verbose:
                 logger.debug('tracking.ini settings:')
@@ -669,7 +719,7 @@ def get_configs(tracking_ini_filepath=None):
             logger.exception(template.format(type(ex).__name__, ex.args))
 
     if not settings_dict:  # something went wrong, presumably missing/broken entries or sections
-        create_configs()  # re-create tracking.ini
+        create_configs(config_filepath=tracking_ini_filepath)  # re-create tracking.ini
         return None
     return settings_dict
 
@@ -705,7 +755,7 @@ def get_data(csv_file_path, dtype=None, check_sorted=True):
                  'POSITION_Y': np.float64,
                  'WIDTH': np.float64,
                  'HEIGHT': np.float64,
-                 # 'DEGREES_ANGLE': np.float64
+                 'DEGREES_ANGLE': np.float64
                  }
     use_cols = list(dtype.keys())
     try:
@@ -862,7 +912,8 @@ def log_infos(settings, format_for_logging=None):
         logger.warning('Manually selecting files disabled due to debugging')
 
     # Infos
-    logger.info('Settings file location: {}'.format(TRACKING_INI_FILEPATH))
+    logger.info('Settings file location: {}'.format(os.path.abspath(settings['tracking_ini_filepath'])))
+    logger.info('Logfile location: {}'.format(os.path.abspath(settings['log file path'])))
     if settings['verbose']:
         logger.info('Verbose enabled, logging set to debug.')
     else:
@@ -962,32 +1013,35 @@ def reshape_result(tuple_of_tuples, *args):
     return tuple(coordinates), additional_info
 
 
-def save_df_to_csv(df, save_path):
+def save_df_to_csv(df, save_path, rename_old_file=True):
     """
     save data frame to csv file
 
     :param df: pandas data frame
     :param save_path: path to csv file
+    :param rename_old_file: whether to try to rename existing files with same name
+    :type rename_old_file: bool
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
+    if rename_old_file:
+        try:
+            old_df_path, old_df_ext = os.path.split(save_path)
+            old_csv = os.path.join(old_df_path, '{}.{}'.format(
+                datetime.now().strftime('%y%m%d%H%M%S'), old_df_ext
+            ))
+            os.rename(save_path, old_csv)
+            logger.critical('Old {} renamed to {}'.format(os.path.basename(save_path), old_csv))
+        except (FileNotFoundError, FileExistsError):
+            pass
+        except Exception as ex:
+            template = 'An exception of type {0} occurred while saving ' \
+                       'previous file {2} after sorting. Arguments:\n{1!r}'
+            logger.exception(template.format(type(ex).__name__, ex.args, save_path))
+        finally:
+            pass
     try:
-        old_df_path, old_df_ext = os.path.split(save_path)
-        old_csv = '{}/{}.{}'.format(
-            old_df_path, datetime.now().strftime('%y%m%d%H%M%S'), old_df_ext
-        )
-        os.rename(save_path, old_csv)
-        logger.critical('Old {} renamed to {}'.format(os.path.basename(save_path), old_csv))
-    except (FileNotFoundError, FileExistsError):
-        pass
-    except Exception as ex:
-        template = 'An exception of type {0} occurred while saving ' \
-                   'previous file {2} after sorting. Arguments:\n{1!r}'
-        logger.exception(template.format(type(ex).__name__, ex.args, save_path))
-    finally:
-        pass
-    try:
-        with open(save_path, 'w+', newline='\n') as csv:  # save again as csv
+        with open(save_path, 'w+', newline='\n') as csv:  # save as csv
             df.to_csv(csv, index=False, encoding='utf-8')
         logger.info('Selected results saved to: {}'.format(save_path))
     except Exception as ex:
@@ -997,11 +1051,12 @@ def save_df_to_csv(df, save_path):
         pass
 
 
-def save_list(path, coords=None, first_call=False, rename_old_list=True, illumination=False):
+def save_list(path, result_folder=None, coords=None, first_call=False, rename_old_list=True, illumination=False):
     """
     Create csv file for results from track_bacteria(), append results
 
     :param path: path to video file for first call, path to .csv file otherwise
+    :param result_folder: optional path to result folder
     :param coords: list of coordinate tuples
     :type coords: list
     :param first_call: whether to create .csv with header
@@ -1014,9 +1069,13 @@ def save_list(path, coords=None, first_call=False, rename_old_list=True, illumin
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
     if first_call:  # set up .csv file
-        pathname, filename_ext = os.path.split(path)
+        pathname_file, filename_ext = os.path.split(path)
+        if result_folder is None:
+            pathname = pathname_file
+        else:
+            pathname = result_folder
         filename = os.path.splitext(filename_ext)[0]
-        file_csv = '{}/{}_list.csv'.format(pathname, filename)
+        file_csv = os.path.join(pathname, '{}_list.csv'.format(filename))
         now = datetime.now().strftime('%y%m%d%H%M%S')
         old_list = False
         permission_error = False
@@ -1104,12 +1163,41 @@ def set_different_colour_filter(colour_filter_new):
     return colour_filter_new  # return flag
 
 
+def shift_np_array(arr, shift, fill_value=np.nan):
+    """
+    preallocate empty array and assign slice of original array, filled with fill_value
+
+    :param arr: array
+    :type arr: np.array
+    :param shift: shift amount, positive or negative
+    :type shift: int
+    :param fill_value: Value to fill up with, default np.nan
+    :return: shifted array
+    """
+    """
+    # preallocate empty array and assign slice by chrisaycock
+    # See origin:
+    # https://stackoverflow.com/questions/30399534/shift-elements-in-a-numpy-array
+    # Accessed last 2019-04-24 13:37:00,101
+    """
+    result_array = np.empty_like(arr)
+    if shift > 0:
+        result_array[:shift] = fill_value
+        result_array[shift:] = arr[:-shift]
+    elif shift < 0:
+        result_array[shift:] = fill_value
+        result_array[:shift] = arr[-shift:]
+    else:
+        result_array[:] = arr
+    return result_array
+
+
 def sort_list(file_path=None, sort=None, df=None, save_file=False):
     """
     sorts pandas data frame, optionally saves it and loads it from csv
 
     :param file_path: file path to save .csv to
-    :param sort: list of columns to sort by
+    :param sort: list of columns to sort by, defaults to ['TRACK_ID', 'POSITION_T']
     :type sort: list
     :param df: optional pandas data frame to be sorted
     :param save_file: whether to save the sorted file
@@ -1123,7 +1211,6 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
         sort = [sort]
     if file_path is not None and df is None:
         df = get_data(file_path, check_sorted=False)  # get data frame from .csv
-        logger.debug('Sorting list {}'.format(file_path))
     try:
         df.sort_values(by=sort, inplace=True, na_position='first')  # Sort data frame
         df.reset_index(drop=True, inplace=True)  # reset index of df
@@ -1133,7 +1220,8 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
         logger.exception(template.format(type(ex).__name__, ex.args, file_path))
         return None
     if save_file and file_path is not None:
-        save_df_to_csv(df=df, save_path=file_path)
+        save_df_to_csv(df=df, save_path=file_path, rename_old_file=False)
+        # rename_old_file False as there will always be an old file
     elif save_file and file_path is None:
         logger.critical('Cannot save file if no file path is provided.')
     return df
@@ -1178,4 +1266,3 @@ def shutdown(seconds=60):
 if __name__ == '__main__':
     get_loggers(log_to_file=False, short_stream_output=True)
     create_configs()
-    sys.exit(0)

@@ -40,12 +40,12 @@ def angle_distribution_plot(df, bins_number, plot_title_name, save_path, dpi=300
     logger = logging.getLogger('ysmr').getChild(__name__)
     angle_radians = df['angle_diff']
     # Create array with average motility percentage per track
-    average_minimum_groups = df.groupby('TRACK_ID')['minimum']
+    average_minimum_groups = df.groupby('TRACK_ID')['moving']
     min_average = np.repeat(average_minimum_groups.mean().to_numpy(), average_minimum_groups.count().to_numpy())
     # Kick out all tracks with less than 70 % motility  @todo: make conditional
     angle_radians_minimum = np.where(
         min_average > 0.7,
-        df['minimum'],
+        df['moving'],
         0
     ).astype(dtype=bool)
 
@@ -88,27 +88,68 @@ def angle_distribution_plot(df, bins_number, plot_title_name, save_path, dpi=300
     plt.close()
 
 
-def large_xy_plot(df, plot_title_name, save_path, dpi=300):
+def colour_bar(ax, dist_min, dist_max):
+    """
+    Adds a colour bar element to axis
+
+    :param ax: matplotlib axis
+    :param dist_min: minimal value
+    :param dist_max: maximal value
+    :return: matplotlib axis
+    """
+    colorbar_map = plt.cm.gist_rainbow
+    norm = mpl.colors.Normalize(vmin=dist_min, vmax=dist_max)
+    cb = mpl.colorbar.ColorbarBase(ax, cmap=colorbar_map, norm=norm, )
+    cb.set_label('\u00B5m')
+    return ax
+
+
+def large_xy_plot(df, plot_title_name, save_path, px_to_micrometre=1, dist_min=0, dist_max=None, dpi=300):
     """
     save x/y-coordinates through time off all tracks on one plot
+
     :param df: pandas data frame with x, y, time coordinates
     :param plot_title_name: name of plot
     :type plot_title_name: str
     :param save_path: path to save image
+    :param px_to_micrometre: ratio between pixel and micrometre
+    :type px_to_micrometre: float
+    :param dist_min: minimal distance for distance bar
+    :type dist_min: float
+    :param dist_max: maximal distance for distance bar
     :param dpi: dpi of saved image
     :type dpi: int
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
-    # DIN A4, as used in the civilised world  # @todo: let user select other, less sophisticated, formats
-    plt.figure(figsize=(11.6929133858, 8.2677165354))  # , gridspec_kw={'width_ratios': [1, 1, 1, 1]}
-    plt.grid(True)
-    plt.axis('equal')
+
+    f = plt.figure()
+    f.set_size_inches(11.6929133858, 8.2677165354)
+
+    outer_space = 0.05
+    # inner_space = 0.03
+    head_space = 0.05
+    width_space = 0.05
+
+    # plt.rcParams.update({'font.size': 8})
+    plt.rcParams['axes.axisbelow'] = True
+
+    gs = gridspec.GridSpec(1, 100, figure=f)
+    gs.update(left=outer_space, right=1 - outer_space, hspace=head_space, wspace=width_space)
+
+    if not dist_max:
+        try:
+            dist_max = df['travelled_dist'].max()
+        except KeyError:
+            dist_max = df['distance_colour'].max()
+
+    large_plot = plt.subplot(gs[0, :-2])  # xy-centered plots
+    dist_bar = plt.subplot(gs[0, -2:])  # distance color-map
     # display initial position as black dots
     grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y'].transform('first')
-    plt.scatter(
-        grouped_df.POSITION_X,
-        grouped_df.POSITION_Y,
+    large_plot.scatter(
+        grouped_df.POSITION_X / px_to_micrometre,
+        grouped_df.POSITION_Y / px_to_micrometre,
         marker='o',
         color='black',
         s=1,
@@ -121,9 +162,9 @@ def large_xy_plot(df, plot_title_name, save_path, dpi=300):
     track_count = 0
     for name, group in grouped_df:
         track_count += 1
-        plt.scatter(
-            group.POSITION_X,
-            group.POSITION_Y,
+        large_plot.scatter(
+            group.POSITION_X / px_to_micrometre,
+            group.POSITION_Y / px_to_micrometre,
             marker='.',
             label=name,
             c=plt.cm.gist_rainbow(group.distance_colour),
@@ -133,7 +174,13 @@ def large_xy_plot(df, plot_title_name, save_path, dpi=300):
             s=1,
             lw=0,
         )
-    plt.title('{} Track count: {}'.format(plot_title_name, track_count))
+    colour_bar(ax=dist_bar, dist_min=dist_min, dist_max=dist_max)
+    # plt.title('{} Track count: {}'.format(plot_title_name, track_count))
+    large_plot.set_xlabel('\u00B5m')
+    large_plot.set_ylabel('\u00B5m')
+    large_plot.set_aspect('equal')
+    large_plot.grid(True)
+    large_plot.set_title('{}'.format(plot_title_name, ))
     plt.savefig(save_path, dpi=dpi)
     logger.debug('Saving figure {}'.format(save_path))
     plt.close()
@@ -142,6 +189,7 @@ def large_xy_plot(df, plot_title_name, save_path, dpi=300):
 def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=300):
     """
     saves plot of all frames centered with initial x/y-coordinates set to 0,0
+
     :param df: pandas data frame
     :param plot_title_name: name of plot
     :type plot_title_name: str
@@ -201,16 +249,25 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     rose_plot.set_title('{}'.format(plot_title_name, ))
 
     # Distance colour indicator bar
-    colorbar_map = plt.cm.gist_rainbow
-    norm = mpl.colors.Normalize(vmin=dist_min, vmax=dist_max)
-    cb = mpl.colorbar.ColorbarBase(dist_bar, cmap=colorbar_map, norm=norm, )
-    cb.set_label('\u00B5m')
+    colour_bar(ax=dist_bar, dist_min=dist_min, dist_max=dist_max)
     plt.savefig(save_path, dpi=dpi)
     logger.debug('Saving figure {}'.format(save_path))
     plt.close()
 
 
 def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=None, dpi=300):
+    """
+    Create a violin plot
+
+    :param df: pandas data frame
+    :param save_path: output save path
+    :param category: category for y-axis
+    :param cut_off_category: category for x-axis
+    :param cut_off_list: list of names for categories in x-axis
+    :param axis: optional matplotlib axis on which to draw
+    :param dpi: dpi of image
+    :return: None
+    """
     logger = logging.getLogger('ysmr').getChild(__name__)
     save_fig = False
     if axis is None:  # in case it's not plotted/saved directly
@@ -273,21 +330,3 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
         plt.close()
     else:
         return axis
-
-
-"""
-settings['save angle distribution plot / bins']
-settings['store processed .csv file']
-settings['store generated statistical .csv file']
-settings['save large plots']
-
-
-'save rose plot'
-'save time violin plot'
-'save acr violin plot'
-'save length violin plot'
-'save turning point violin plot'
-'save speed violin plot'
-'collate results csv to xlsx'
--> collate results .csv to xlsx + delete .csv
-"""

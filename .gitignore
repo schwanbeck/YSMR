@@ -5,4 +5,4 @@
 *_sync*
 *.xlsx
 *legacy*
-*test.py
+**/*test*

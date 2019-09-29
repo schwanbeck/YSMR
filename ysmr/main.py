@@ -24,10 +24,10 @@ from time import sleep
 
 from ysmr.helper_file import (check_logfile, collate_results_csv_to_xlsx, create_results_folder, elapsed_time,
                               get_any_paths, get_configs, get_loggers, log_infos, shutdown)
-from ysmr.track_eval import evaluate_tracks, select_tracks, track_bacteria
+from ysmr.track_eval import annotate_video, evaluate_tracks, select_tracks, track_bacteria
 
 
-def analyse(path, settings=None, result_folder=None):
+def analyse(path, settings=None, result_folder=None, return_df=False):
     """
     Starts analysis function (evaluate_tracks, select_tracks, track_bacteria), depending on received file type.
     Continues with analysis depending on provided settings.
@@ -36,6 +36,8 @@ def analyse(path, settings=None, result_folder=None):
     :param settings: tracking.ini settings
     :type settings: dict
     :param result_folder: folder to save results in
+    :param return_df: whether to return resulting data frame
+    :type return_df: bool
     :return: pandas data frame(s), depending on last analysis step
     """
     t_one = datetime.now()  # to get rough time estimation
@@ -53,9 +55,11 @@ def analyse(path, settings=None, result_folder=None):
     return_value = None
     if result_folder is None:
         result_folder = create_results_folder(path)
+    # path = os.path.realpath(path)
     # See if we need to evaluate for anything, otherwise we'll skip evaluate_tracks()
     plots_eval = any([
         settings['store generated statistical .csv file'],
+        settings['store final analysed .csv file'],
         settings['save large plots'],
         settings['save rose plot'],
         settings['save time violin plot'],
@@ -65,14 +69,14 @@ def analyse(path, settings=None, result_folder=None):
         settings['save speed violin plot'],
         settings['save angle distribution plot / bins'],
         settings['collate results csv to xlsx'],
+        settings['save video']
     ])
     df, fps, f_height, f_width, csv_file = [None] * 5
 
     while True:  # so we can break on error
-        if '_statistics.csv' in path:  # Already evaluated file
-            logger.warning('File already evaluated. '
-                           'Please supply file ending in \'selected_data.csv\' instead. '
-                           'File: {}'.format(path))
+        finished_files = ['_analysed.csv', '_statistics.csv']
+        if any(file_ext in path for file_ext in finished_files):  # Already evaluated file
+            logger.warning('File already evaluated. File: {}'.format(path))
             return_value = None
             break
         if '.csv' not in path:  # as long as it's not a .csv, it should be a video:
@@ -108,6 +112,13 @@ def analyse(path, settings=None, result_folder=None):
                 settings=settings,
                 fps=fps
             )
+            if settings['save video'] and '.csv' not in path:
+                annotate_video(
+                    video_path=path,
+                    df=return_value[0],
+                    settings=settings,
+                    result_folder=result_folder,
+                )
         # if nothing is selected for evaluation and it's specifically a selected_data.csv, something seems wrong
         elif 'selected_data.csv' in path:
             logger.warning('No evaluation set to true in settings. Did not evaluate {}'.format(path))
@@ -121,8 +132,10 @@ def analyse(path, settings=None, result_folder=None):
         except Exception as ex:
             template = 'An exception of type {0} occurred. Arguments:\n{1!r}'
             logger.exception(template.format(type(ex).__name__, ex.args))
-    if return_value:
+    if return_value is not None:
         end_string = 'Finished with'
+        if not return_df:
+            return_value = True
     else:
         end_string = 'Error during'
     logger.info('{} process - module: {} PID: {}, elapsed time: {}'.format(
@@ -130,14 +143,16 @@ def analyse(path, settings=None, result_folder=None):
     return return_value
 
 
-def ysmr(paths=None, settings=None):
+def ysmr(paths=None, settings=None, result_folder=None):
     """
     Starts asynchronous multiprocessing of provided file(s) with analyse().
 
     :param settings: tracking.ini settings
-    :type settings: dict
+    :type settings: dict, str, os.PathLike
     :param paths: path or iterable with paths
     :type paths: str, list, os.PathLike
+    :param result_folder: path to result folder, if not provided, one will be created in first path folder
+    :type result_folder: str, list, os.PathLike
     :return: list of (finished path, results)
     :rtype paths_finished: list
     """
@@ -172,7 +187,7 @@ def ysmr(paths=None, settings=None):
     else:
         if settings['select files']:
             if not paths:
-                paths = get_any_paths(rename=True)
+                paths = get_any_paths(rename=True, settings=settings)
             if not paths:
                 logger.critical('No files selected.')
                 queue_listener.stop()
@@ -181,7 +196,7 @@ def ysmr(paths=None, settings=None):
             if not paths:
                 paths = [settings['path to test video']]
             logger.info('Test video path selected')
-        folder_path = os.path.dirname(paths[0])
+        # folder_path = os.path.dirname(paths[0])
         for path in paths:
             logger.debug(path)
         logger.info('Total number of files: {}'.format(len(paths)))
@@ -199,7 +214,10 @@ def ysmr(paths=None, settings=None):
                     logger.debug('User has given it\'s blessing.')
                     break
         results = {}
-        result_folder = create_results_folder(paths[0])
+        if result_folder is None:
+            result_folder = create_results_folder(paths[0])
+        else:
+            result_folder = create_results_folder(result_folder)
 
         pool = mp.Pool()  # get a pool of worker processes per available core
         for path in paths:
@@ -232,7 +250,7 @@ def ysmr(paths=None, settings=None):
         else:
             logger.info('Finished with all files.')
         if settings['collate results csv to xlsx']:
-            collate_results_csv_to_xlsx(path=folder_path, save_path=result_folder)
+            collate_results_csv_to_xlsx(path=result_folder, save_path=result_folder)  # folder_path
 
     if settings['shut down after analysis']:
         shutdown()
