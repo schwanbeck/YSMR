@@ -921,13 +921,16 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df['tp_dist'] = df.groupby('tp_of_tracks')['travelled_dist'].transform('sum')
     # limit to 10 or half minimal length in seconds/limit track length to x seconds, whichever is shortest
     # halves are used as some tracks might be shorter when limit exactly is not in use
-    seconds_difference = min(
-        [10, settings['minimal length in seconds'] / 2, settings['limit track length to x seconds'] / 2]
-    )
+    seconds_difference_list = [10]
+    if 0 < settings['minimal length in seconds'] / 2 < 10:
+        seconds_difference_list.append(settings['minimal length in seconds'] / 2)
+    if 0 < settings['limit track length to x seconds'] / 2 < 10:
+        seconds_difference_list.append(settings['limit track length to x seconds'] / 2)
+    seconds_difference = min(seconds_difference_list)
     # Get largest displacement per bacterium divided by individual length over ~10 s
-    x_fps_diff = df.groupby('TRACK_ID')['x_norm'].diff(int(round((fps * seconds_difference), 0)))
-    y_fps_diff = df.groupby('TRACK_ID')['y_norm'].diff(int(round((fps * seconds_difference), 0)))
-    df['pdist_series_max'] = np.sqrt(np.square(x_fps_diff) + np.square(y_fps_diff))
+    df['x_fps_diff'] = df.groupby('TRACK_ID')['x_norm'].diff(int(round((fps * seconds_difference), 0)))
+    df['y_fps_diff'] = df.groupby('TRACK_ID')['y_norm'].diff(int(round((fps * seconds_difference), 0)))
+    df['pdist_series_max'] = np.sqrt(np.square(df['x_fps_diff']) + np.square(df['y_fps_diff']))
     df['pdist_series_max'] = df.groupby('TRACK_ID')['pdist_series_max'].transform('max')
     # Divide by bac. length
     df['pdist_series_max'] = df['pdist_series_max'] / df['bac_average_size']
@@ -1013,14 +1016,14 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     del turn_percent_series, dist_series, speed_series, time_series, pdist_series, motile_series
 
     if settings['store generated statistical .csv file']:
-        df_stats_columns = name_of_columns
+        # df_stats_columns = name_of_columns
         # switch IDs to first column
-        df_stats_columns[0], df_stats_columns[-1] = df_stats_columns[-1], df_stats_columns[0]  # TRACK_ID first
+        # df_stats_columns[0], df_stats_columns[-1] = df_stats_columns[-1], df_stats_columns[0]  # TRACK_ID first
         save_df_to_csv(
-            df=df_stats.reindex(columns=df_stats_columns),
+            df=df_stats,  # .reindex(columns=df_stats_columns),
             save_path=save_path.format('statistics', '.csv')
         )
-        df_stats.reindex(columns=name_of_columns)
+        # df_stats.reindex(columns=name_of_columns)
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
     nonmotile = df['motility_phenotype'].where(df['motility_phenotype'] == 0).count() / df.shape[0]
     twitching = df['motility_phenotype'].where(df['motility_phenotype'] == 1).count() / df.shape[0]
