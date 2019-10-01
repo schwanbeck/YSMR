@@ -267,7 +267,7 @@ def create_configs(config_filepath=None):
         https://stackoverflow.com/questions/434597/
         Accessed last 2019-06-07 13:37:00,101        
         """
-        # @todo: untested on linux & mac
+        # @todo: untested on mac
         if os.name is 'nt':  # Windows
             # works with spaces in name whereas subprocess.call(('start', path), shell=True) does not
             response = subprocess.run(('cmd /c start "" "{}"'.format(config_filepath)), stderr=subprocess.PIPE)
@@ -285,7 +285,7 @@ def create_configs(config_filepath=None):
         sys.exit('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
 
 
-# Check tracking.ini / create it
+# Check tracking.ini / create it --> moved into functions
 # TRACKING_INI_FILEPATH = os.path.join(os.path.abspath('./'), 'tracking.ini')
 # if not os.path.isfile(TRACKING_INI_FILEPATH):  # needed by later functions
 #     create_configs(config_filepath=TRACKING_INI_FILEPATH)
@@ -373,7 +373,8 @@ def create_results_folder(path):
 
 def creation_date(path_to_file):
     """
-    checks the creation date of the provided file
+    Try to get the date that a file was created, falling back to when it was
+    last modified if that isn't possible.
     See for explanation/source:
     https://stackoverflow.com/a/39501288/1709587
     Accessed last 2019-03-01 13:37:00,101
@@ -381,8 +382,6 @@ def creation_date(path_to_file):
     :param path_to_file: path to file
     :return: time since file creation in seconds
     :rtype: int
-    Try to get the date that a file was created, falling back to when it was
-    last modified if that isn't possible.
     """
     if os.path.isfile(path_to_file):
         now = datetime.now()
@@ -1166,6 +1165,9 @@ def set_different_colour_filter(colour_filter_new):
 def shift_np_array(arr, shift, fill_value=np.nan):
     """
     preallocate empty array and assign slice of original array, filled with fill_value
+    # See origin:
+    # https://stackoverflow.com/questions/30399534/shift-elements-in-a-numpy-array
+    # Accessed last 2019-04-24 13:37:00,101
 
     :param arr: array
     :type arr: np.array
@@ -1173,12 +1175,6 @@ def shift_np_array(arr, shift, fill_value=np.nan):
     :type shift: int
     :param fill_value: Value to fill up with, default np.nan
     :return: shifted array
-    """
-    """
-    # preallocate empty array and assign slice by chrisaycock
-    # See origin:
-    # https://stackoverflow.com/questions/30399534/shift-elements-in-a-numpy-array
-    # Accessed last 2019-04-24 13:37:00,101
     """
     result_array = np.empty_like(arr)
     if shift > 0:
