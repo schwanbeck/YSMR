@@ -339,7 +339,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     last_object_id = next(reversed(objects))  # get number of last object
     df_for_eval = sort_list(file_path=list_name, save_file=not settings['delete .csv file after analysis'])
 
-    logger.info('fps: {}, objects: {}, frames: {}, csv: {}'.format(  # Display some infos
+    logger.info('Average frames analysed per second: {}, objects: {}, frames: {}, csv: {}'.format(  # Display some infos
         '{:.2f}'.format((sum(fps_total) / curr_frame_count)).rjust(6, ' '),  # Average FPS
         '{}'.format(last_object_id + 1).rjust(6, ' '),  # Total Nr. of objects
         '{:>6} of {:>6}'.format(curr_frame_count, frame_count),  # Current frames / total frames
