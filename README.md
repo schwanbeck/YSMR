@@ -132,6 +132,11 @@ optional argument.
 + save video : False
 	+ When set to True, selected tracks will be annotated in the original video.
 	+ This can only be performed when ysmr() starts out with a video file and not with an already processed .csv file.
+	+ Legend:
+        + Green: motile bacteria
+        + White: calculated turning point
+        + Orange: immotile bacteria
+
 	+ Accepts 'True' or 'False'.
 
 ##### RESULTS SETTINGS
