@@ -820,7 +820,7 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     queue_listener = None
     if len(logger.handlers) > 0:
         for handler in logger.handlers:
-            if isinstance(handler, QueueHandler):
+            if isinstance(handler, QueueListener):
                 queue_listener = handler  # if we have our handler, we can stop
                 break
     if not queue_listener:  # otherwise, we have to set it up

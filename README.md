@@ -136,7 +136,6 @@ optional argument.
         + Green: motile bacteria
         + White: calculated turning point
         + Orange: immotile bacteria
-
 	+ Accepts 'True' or 'False'.
 
 ##### RESULTS SETTINGS
