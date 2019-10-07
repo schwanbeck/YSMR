@@ -335,8 +335,11 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                 type(file_removal_error).__name__, list_name, file_removal_error.args))
         finally:
             pass
-
-    last_object_id = next(reversed(objects))  # get number of last object
+    try:
+        last_object_id = next(reversed(objects))  # get number of last object
+    except StopIteration:
+        logger.warning('Did not track any objects. File: {}'.format(video_path))
+        return None
     df_for_eval = sort_list(file_path=list_name, save_file=not settings['delete .csv file after analysis'])
 
     logger.info('Average frames analysed per second: {}, objects: {}, frames: {}, csv: {}'.format(  # Display some infos
