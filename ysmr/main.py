@@ -23,7 +23,7 @@ from datetime import datetime
 from time import sleep
 
 from ysmr.helper_file import (check_logfile, collate_results_csv_to_xlsx, create_results_folder, elapsed_time,
-                              get_any_paths, get_configs, get_loggers, log_infos, shutdown)
+                              get_any_paths, get_configs, get_loggers, log_infos, shutdown, stop_logging_queue)
 from ysmr.track_eval import annotate_video, evaluate_tracks, select_tracks, track_bacteria
 
 
@@ -165,7 +165,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
     if isinstance(paths, str) or isinstance(paths, os.PathLike):
         paths = [paths]  # convert to list, otherwise for path in paths iterates over characters in string
     check_logfile(path=settings['log file path'])
-    queue_listener, format_for_logging = get_loggers(
+    format_for_logging = get_loggers(
         log_level=settings['log_level'],
         logfile_name=settings['log file path'],
         short_stream_output=settings['shorten displayed logging output'],
@@ -190,7 +190,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
                 paths = get_any_paths(rename=True, settings=settings)
             if not paths:
                 logger.critical('No files selected.')
-                queue_listener.stop()
+                stop_logging_queue(logger)
                 sys.exit('No files selected.')
         else:
             if not paths:
@@ -208,7 +208,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
             if 0 < len(event) < 4:
                 if event[0].lower() == 'n':
                     logger.info('Process aborted.\n')
-                    queue_listener.stop()
+                    stop_logging_queue(logger)
                     sys.exit(1)
                 elif event[0].lower() == 'y':
                     logger.debug('User has given it\'s blessing.')
@@ -255,7 +255,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
     if settings['shut down after analysis']:
         shutdown()
     logger.info('Elapsed time: {}\n{}\n'.format(elapsed_time(t_one), filler_for_logger))
-    queue_listener.stop()
+    stop_logging_queue(logger)
     return paths_finished
 
 

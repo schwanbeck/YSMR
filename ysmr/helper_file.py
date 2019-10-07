@@ -114,7 +114,7 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
             ('csv', '.csv'),
             ('all files', '.*'),
         ])
-    file_path = '{}{}_collated_statistics.xlsx'.format(save_path, datetime.now().strftime('%y%m%d%H%M%S'))
+    file_path = os.path.join(save_path, '{}_collated_statistics.xlsx'.format(datetime.now().strftime('%y%m%d%H%M%S')))
     paths = find_paths(base_path=path, extension=csv_extension)
     if paths:
         writer = pd.ExcelWriter(file_path, engine='xlsxwriter')
@@ -798,7 +798,7 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     :type short_file_output: bool
     :param log_to_file: whether to use a logfile
     :type log_to_file: bool
-    :return: logging queue, longest used logging format
+    :return: longest used logging format
     """
     logger = logging.getLogger('ysmr')
     logger.propagate = False
@@ -817,13 +817,18 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                            '{message}'
     # Sets the global logging format.
     logging.basicConfig(format=(long_format_logging, ), style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"
-    queue_listener = None
+    queue_handler = None
+    # queue_listener = None
     if len(logger.handlers) > 0:
         for handler in logger.handlers:
-            if isinstance(handler, QueueListener):
-                queue_listener = handler  # if we have our handler, we can stop
+            if isinstance(handler, QueueHandler):
+                queue_handler = handler  # if we have our handler, we can stop
                 break
-    if not queue_listener:  # otherwise, we have to set it up
+            # elif isinstance(handler, QueueListener):
+            #     queue_listener = handler
+            # Works without searching for/assigning QueueListener
+            # Although I don't get why
+    if not isinstance(queue_handler, QueueHandler):  # otherwise, we have to set it up
         logger_formatter = logging.Formatter(long_format_logging, style='{')  # ISO8601: , "%Y-%m-%dT%H:%M:%S%z"
         short_logger_formatter = logging.Formatter(short_format_logging, style='{')
         logger.setLevel(log_level)
@@ -857,7 +862,7 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
         return_format = short_format_logging
     elif not log_to_file and short_stream_output:
         return_format = short_format_logging
-    return queue_listener, return_format
+    return return_format
 
 
 def log_infos(settings, format_for_logging=None):
@@ -1221,6 +1226,18 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
     elif save_file and file_path is None:
         logger.critical('Cannot save file if no file path is provided.')
     return df
+
+
+def stop_logging_queue(logger=None):
+    logger_list = [logger, logging.getLogger('ysmr').getChild(__name__), logging.getLogger('ysmr')]
+    for logger in logger_list:
+        try:
+            if len(logger.handlers) > 0:
+                for handler in logger.handlers:
+                    if isinstance(handler, QueueListener):
+                        handler.stop()
+        except (AttributeError, TypeError):
+            pass
 
 
 def shutdown(seconds=60):
