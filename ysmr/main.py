@@ -74,7 +74,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
     df, fps, f_height, f_width, csv_file = [None] * 5
 
     while True:  # so we can break on error
-        finished_files = ['_analysed.csv', '_statistics.csv']
+        finished_files = ['_analysed.csv', '_statistics.csv', '_annotated_output.']
         if any(file_ext in path for file_ext in finished_files):  # Already evaluated file
             logger.warning('File already evaluated. File: {}'.format(path))
             return_value = None
