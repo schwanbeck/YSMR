@@ -6,3 +6,4 @@
 *.xlsx
 *legacy*
 **/*test*
+test/
