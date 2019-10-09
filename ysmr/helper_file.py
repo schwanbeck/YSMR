@@ -17,6 +17,7 @@ not, see <http://www.gnu.org/licenses/>.
 
 import collections
 import configparser
+import json
 import logging
 import os
 import platform
@@ -917,7 +918,8 @@ def log_infos(settings, format_for_logging=None):
 
     # Infos
     logger.info('Settings file location: {}'.format(os.path.abspath(settings['tracking_ini_filepath'])))
-    logger.info('Logfile location: {}'.format(os.path.abspath(settings['log file path'])))
+    if settings['log to file']:
+        logger.info('Logfile location: {}'.format(os.path.abspath(settings['log file path'])))
     if settings['verbose']:
         logger.info('Verbose enabled, logging set to debug.')
     else:
@@ -1002,6 +1004,50 @@ def make_dir(new_directory):
             os.mkdir(new_directory)
 
 
+def metadata_file(path=None, verbose=False, **kwargs):
+    """Reads meta data from file if it exists, update/create file if new ones are provided.
+    Keys with None as value will be removed. meta.json file will be searched for in folder and parent folder.
+
+    :param path: path to original file
+    :param verbose: print meta.json file path
+    :type verbose: bool
+    :param kwargs: meta data
+    :return: meta data
+    :rtype: dict
+    """
+    logger = logging.getLogger('ysmr').getChild(__name__)
+    if '_meta.json' not in path:
+        path, _ = os.path.splitext(path)
+        path = '{}_meta.json'.format(path)
+    meta_data = {}
+    # also look for metadata file in parent folder
+    path_parent, file_name = os.path.split(path)
+    path_parent = os.path.join(os.path.dirname(path_parent), file_name)
+    for p in [path, path_parent]:
+        if verbose:
+            logging.debug('Searching for meta file in path: {}'.format(p))
+        try:
+            with open(p, 'r') as file:
+                meta_data_unfiltered = json.load(file)
+            # clear None values
+            meta_data.update({key: val for key, val in meta_data_unfiltered.items() if val is not None})
+            path = p
+            break
+        except FileNotFoundError:
+            pass
+    # clear None values
+    filtered_kwargs = {key: val for key, val in kwargs.items() if val is not None}
+    if filtered_kwargs:
+        # So new values overwrite the ones in the file, not vice versa
+        meta_data.update(filtered_kwargs)
+        try:
+            with open(path, 'w+') as file:
+                json.dump(meta_data, file)
+        except (PermissionError, FileNotFoundError) as ex:
+            logger.exception(ex)
+    return meta_data
+
+
 def reshape_result(tuple_of_tuples, *args):
     """
     reshape tuple of tuples into (x, y, *args) and (width, height, degrees_orientation)
@@ -1047,7 +1093,7 @@ def save_df_to_csv(df, save_path, rename_old_file=True):
     try:
         with open(save_path, 'w+', newline='\n') as csv:  # save as csv
             df.to_csv(csv, index=False, encoding='utf-8')
-        logger.info('Selected results saved to: {}'.format(save_path))
+        logger.debug('Selected results saved to: {}'.format(save_path))
     except Exception as ex:
         template = 'An exception of type {0} occurred while saving file {2} after sorting. Arguments:\n{1!r}'
         logger.exception(template.format(type(ex).__name__, ex.args, save_path))

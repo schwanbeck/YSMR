@@ -54,8 +54,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         short_stream_output=settings['shorten displayed logging output'],
         short_file_output=settings['shorten logfile logging output'],
         log_to_file=settings['log to file'])
-    # Log some general stuff
-    logger.debug('Starting process - module: {} PID: {}'.format(__name__, os.getpid()))
     # Check for errors
     if not os.path.isfile(video_path):
         logger.critical('File {} does not exist'.format(video_path))
@@ -131,7 +129,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     #                           fps_of_file,  # FPS
     #                           (frame_width, frame_height)  # Dimensions
     #                           )
-
     # # min_frame_count += skip_frames
     while True:  # Loop over video
         # if cv2.waitKey(1) & 0xFF == ord('n'):  # frame-by-frame
@@ -148,7 +145,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         if not ret and (frame_count == curr_frame_count + 1 or  # some file formats skip one frame
                         frame_count == curr_frame_count) and frame_count >= settings['minimal frame count']:
             # If a frame could not be retrieved and the minimum frame nr. has been reached
-            logger.info('Frames from file {} read.'.format(filename_ext))
+            logger.debug('Frames from file {} read.'.format(filename_ext))
             break
         elif not ret:  # Something must've happened, user decides if to proceed
             logger.critical('Error during cap.read() with file {}'.format(video_path))
@@ -477,7 +474,7 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary, fra
 
 
 def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
-                  frame_height=None, frame_width=None, settings=None):
+                  frame_height=None, frame_width=None, settings=None, **_):
     """
     selection of good tracks from file or data frame according to various parameters
     either file or data frame have to be provided
@@ -718,14 +715,10 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
                     df.loc[good_start:good_stop, 'POSITION_T'] == limit_track_length_curr).idxmax()
             if np.isnan(good_stop_curr):
                 continue
-            # if (good_stop_curr - good_start) > limit_track_to_frames:
-            #     logger.debug('Timing off: start: {}, stop: {}, stop calc.:{} diff: {}'.format(
-            #         good_start, good_stop, good_stop_curr, (good_stop_curr - good_start)))
-            #     continue
             good_stop = good_stop_curr
             # Exclude NaNs in case no index can be found within returned track
         good_track.append((good_start, good_stop))
-    logger.debug('All tracks before fine selection: {}, left over: {}, difference: {}'.format(
+    logger.info('All tracks before fine selection: {}, left over: {}, difference: {}'.format(
         len(track_change), len(good_track), (len(track_change) - len(good_track))))
     '''
     # kick_reason: 
@@ -774,7 +767,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     return df
 
 
-def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps=None, ):
+def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps=None, **_):
     """
     calculate additional info from provided .csv/data frame
 
@@ -1168,7 +1161,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     return df, df_stats
 
 
-def annotate_video(video_path, df, output_save=True, settings=None, result_folder=None, select_subtype=None, ):
+def annotate_video(video_path, df, output_save=True, settings=None, result_folder=None, select_subtype=None, **_):
     """
     Annotate video with positions and properties from data frame
 
@@ -1241,7 +1234,6 @@ def annotate_video(video_path, df, output_save=True, settings=None, result_folde
         output_video_name = os.path.join(result_folder, '{}_subtype_{}_annotated_output{}'.format(
             select_subtype, filename, settings['save video file extension']))
 
-    logger.info('Output video file: {}'.format(output_video_name))
     _, filename_ext = os.path.split(video_path)
     filename = os.path.splitext(filename_ext)[0]
     if output_save:
@@ -1259,7 +1251,7 @@ def annotate_video(video_path, df, output_save=True, settings=None, result_folde
         if not ret and (frame_count == curr_frame + 1 or  # some file formats skip one frame
                         frame_count == curr_frame) and frame_count >= settings['minimal frame count']:
             # If a frame could not be retrieved and the minimum frame nr. has been reached
-            logger.info('Frames from file {} read.'.format(filename_ext))
+            logger.debug('Frames from file {} read.'.format(filename_ext))
             break
         elif not ret:  # Something must've happened, user decides if to proceed
             logger.critical('Error during cap.read() with file {}'.format(video_path))
@@ -1314,5 +1306,6 @@ def annotate_video(video_path, df, output_save=True, settings=None, result_folde
         curr_frame += 1
     if output_save:
         out.release()
+        logger.debug('Output video file: {}'.format(output_video_name))
     cap.release()
     cv2.destroyAllWindows()  # Close active windows

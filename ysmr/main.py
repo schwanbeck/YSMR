@@ -23,11 +23,12 @@ from datetime import datetime
 from time import sleep
 
 from ysmr.helper_file import (check_logfile, collate_results_csv_to_xlsx, create_results_folder, elapsed_time,
-                              get_any_paths, get_configs, get_loggers, log_infos, shutdown, stop_logging_queue)
+                              get_any_paths, get_configs, get_loggers, log_infos, metadata_file, shutdown,
+                              stop_logging_queue)
 from ysmr.track_eval import annotate_video, evaluate_tracks, select_tracks, track_bacteria
 
 
-def analyse(path, settings=None, result_folder=None, return_df=False):
+def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
     """
     Starts analysis function (evaluate_tracks, select_tracks, track_bacteria), depending on received file type.
     Continues with analysis depending on provided settings.
@@ -38,6 +39,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
     :param result_folder: folder to save results in
     :param return_df: whether to return resulting data frame
     :type return_df: bool
+    :param kwargs: kwargs will be saved to meta data file (_meta.json)
     :return: pandas data frame(s), depending on last analysis step
     """
     t_one = datetime.now()  # to get rough time estimation
@@ -52,6 +54,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
         log_to_file=settings['log to file']
     )
     logger = logging.getLogger('ysmr').getChild(__name__)
+    logger.debug('Starting process. PID: {}'.format(os.getpid()))
     return_value = None
     if result_folder is None:
         result_folder = create_results_folder(path)
@@ -71,6 +74,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
         settings['collate results csv to xlsx'],
         settings['save video']
     ])
+    # set values to None
     df, fps, f_height, f_width, csv_file = [None] * 5
 
     while True:  # so we can break on error
@@ -80,6 +84,8 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
             return_value = None
             break
         if '.csv' not in path:  # as long as it's not a .csv, it should be a video:
+            if settings['verbose']:
+                logging.debug('File ends not in .csv, file is assumed to be a video.')
             track_result = track_bacteria(video_path=path, settings=settings, result_folder=result_folder)
             if track_result is None:
                 logger.warning('Error during video analysis of file {}.'.format(path))
@@ -87,16 +93,30 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
                 break
             (df, fps, f_height, f_width, csv_file) = track_result
             return_value = df
+        # save fps and frame dimensions in metadata json
+        meta_data = metadata_file(
+            # meta.json file will be searched for in provided folder and parent folder
+            path=os.path.join(result_folder, os.path.basename(path)),
+            verbose=settings['verbose'],
+            fps=fps,
+            frame_height=f_height,
+            frame_width=f_width,
+            **kwargs,
+        )
+        if settings['debugging']:
+            for key, value in meta_data.items():
+                logger.debug('{}: {}'.format(key, value))
         # if it's not evaluated yet:
         if 'selected_data.csv' not in path and (plots_eval or settings['store processed .csv file']):
             df = select_tracks(
                 path_to_file=path,
                 df=df,
                 results_directory=result_folder,
-                fps=fps,
-                frame_height=f_height,
-                frame_width=f_width,
-                settings=settings
+                # fps=fps,  # taken from **meta_data
+                # frame_height=f_height,
+                # frame_width=f_width,
+                settings=settings,
+                **meta_data
             )
             if df is None:
                 logger.warning('Error during video analysis of file {}.'.format(path))
@@ -110,18 +130,24 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
                 results_directory=result_folder,
                 df=df,
                 settings=settings,
-                fps=fps
+                # fps=fps,  # taken from **meta_data
+                **meta_data
             )
             if settings['save video'] and '.csv' not in path:
                 annotate_video(
                     video_path=path,
                     df=return_value[0],
                     settings=settings,
-                    result_folder=result_folder,
+                    result_folder=result_folder
                 )
+            elif settings['save video'] and '.csv' in path:
+                logger.warning(
+                    '\'save video\' setting is enabled but .csv file was provided. Video can only be annotated '
+                    'when ysmr() is given a video as an argument. Optionally use annotate_video() from '
+                    'ysmr.track_eval directly.')
         # if nothing is selected for evaluation and it's specifically a selected_data.csv, something seems wrong
         elif 'selected_data.csv' in path:
-            logger.warning('No evaluation set to true in settings. Did not evaluate {}'.format(path))
+            logger.warning('No evaluation set to True in settings. Did not evaluate {}'.format(path))
         break  # all is well
 
     if settings['delete .csv file after analysis'] and csv_file:
@@ -138,8 +164,8 @@ def analyse(path, settings=None, result_folder=None, return_df=False):
             return_value = True
     else:
         end_string = 'Error during'
-    logger.info('{} process - module: {} PID: {}, elapsed time: {}'.format(
-        end_string, __name__, os.getpid(), elapsed_time(t_one)))
+    logger.info('{} process. PID: {}, elapsed time: {}'.format(
+        end_string, os.getpid(), elapsed_time(t_one)))
     return return_value
 
 
@@ -176,8 +202,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
     filler_for_logger = log_infos(settings=settings, format_for_logging=format_for_logging)
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
-        folder_path = os.path.dirname(settings['path to test video'])
-        result_folder = create_results_folder(path=folder_path)
+        result_folder = create_results_folder(path=settings['path to test video'])
         result = analyse(settings['path to test video'], settings=settings, result_folder=result_folder)
         if result:
             paths_finished.append(settings['path to test video'])
