@@ -172,6 +172,9 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
 def ysmr(paths=None, settings=None, result_folder=None):
     """
     Starts asynchronous multiprocessing of provided file(s) with analyse().
+    Due to the use of multiprocessing, ysmr() should be called in a
+    "if __name__ == "__main__":" block. Doing otherwise can lead to
+    unexpected behaviour.
 
     :param settings: tracking.ini settings
     :type settings: dict, str, os.PathLike
