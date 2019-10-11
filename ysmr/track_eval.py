@@ -319,8 +319,9 @@ def track_bacteria(video_path, settings=None, result_folder=None):
 
     # if settings['save video']:
     #     out.release()
+    if settings['display video analysis']:
+        cv2.destroyAllWindows()  # Close active windows
     cap.release()
-    cv2.destroyAllWindows()  # Close active windows
 
     if old_list and error_during_read:  # Strings evaluate to true, otherwise false; restores old results
         try:
@@ -1307,5 +1308,6 @@ def annotate_video(video_path, df, output_save=True, settings=None, result_folde
     if output_save:
         out.release()
         logger.debug('Output video file: {}'.format(output_video_name))
+    else:
+        cv2.destroyAllWindows()  # Close active windows
     cap.release()
-    cv2.destroyAllWindows()  # Close active windows
