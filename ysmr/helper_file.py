@@ -75,7 +75,6 @@ def bytes_to_human_readable(number_of_bytes):
     Inspired by https://stackoverflow.com/questions/44096473/
     Returns string containing bytes, rounded to 1 decimal place,
     with unit prefix as defined by SI.
-    For documentation purposes only.
 
     :param number_of_bytes: bytes to convert
     :type number_of_bytes: int
@@ -284,13 +283,6 @@ def create_configs(config_filepath=None):
         # continue with a freshly generated one, we'll stop execution here.
         logger.critical('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
         sys.exit('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
-
-
-# Check tracking.ini / create it --> moved into functions
-# TRACKING_INI_FILEPATH = os.path.join(os.path.abspath('./'), 'tracking.ini')
-# if not os.path.isfile(TRACKING_INI_FILEPATH):  # needed by later functions
-#     create_configs(config_filepath=TRACKING_INI_FILEPATH)
-# _config.read(TRACKING_INI_FILEPATH)
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
