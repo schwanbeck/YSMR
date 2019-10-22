@@ -493,6 +493,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     :type settings: dict
     :return: pandas data frame of selected tracks
     """
+    # @todo: use kwargs to overwrite settings dict
     logger = logging.getLogger('ysmr').getChild(__name__)
     settings = get_configs(settings)  # Get settings
     if settings is None:
@@ -946,6 +947,13 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         1,
         df['motility_phenotype']
     )
+
+    motility_categories = ['immotile', 'twitching', 'motile']
+
+    df['motility_phenotype'].replace(  # replace 0 / 1 / 2 with immotile / twitching / motile
+        {value: key for key, value in zip(motility_categories, range(0, len(motility_categories) + 1))},
+        inplace=True)
+
     # Source: ALollz, stackoverflow.com/questions/51064346/
     # Get largest displacement during track
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
@@ -968,10 +976,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                   acr_series / dist_series,
                   0
                   )), index=time_series.index)
-    turn_percent_series = df.groupby('TRACK_ID')['turn_points'].agg('sum') - 1  # as each track starts with a TP
-    turn_percent_series = pd.Series(
+    # Subtract one as each track starts with a TP and multiply by fps;
+    # As we'll divide by time afterwards so we can get 1/s if there is one positive in one second
+    turn_per_s_series = (df.groupby('TRACK_ID')['turn_points'].agg('sum') - 1) * fps
+    turn_per_s_series = pd.Series(
         (np.where(motile_total_series != 0,
-                  turn_percent_series / motile_total_series,
+                  turn_per_s_series / motile_total_series,
                   0)), index=time_series.index)
 
     bac_length_series = pd.Series(df.groupby('TRACK_ID')['bac_length'].agg('mean'))
@@ -982,6 +992,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             0
         )), index=time_series.index)
     track_id = df.groupby('TRACK_ID')['TRACK_ID'].agg('last')
+    mot_phenotype = df.groupby('TRACK_ID')['pdist_series_max'].agg('last')
 
     name_of_columns = [
         'Turn Points (TP/s)',  # 0
@@ -993,11 +1004,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         'Arc-Chord Ratio',  # 6
         'Bacteria Length',  # 7
         'Displacement divided by length',  # 8
-        'TRACK_ID',  # 9
+        'Motility Phenotype',  # 9
+        'TRACK_ID',  # 10
     ]
     # Create df for statistics
     df_stats = pd.concat(
-        [turn_percent_series,  # 0
+        [turn_per_s_series,  # 0
          dist_series,  # 1
          speed_series,  # 2
          time_series,  # 3
@@ -1006,11 +1018,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
          acr_series,  # 6
          bac_length_series,  # 7
          displ_bac_series,  # 8
-         track_id,  # 9
+         mot_phenotype,  # 9
+         track_id,  # 10
          ],
         keys=name_of_columns, axis=1
     )
-    del turn_percent_series, dist_series, speed_series, time_series, pdist_series, motile_series
+    del turn_per_s_series, dist_series, speed_series, time_series, pdist_series, motile_series
 
     if settings['store generated statistical .csv file']:
         # df_stats_columns = name_of_columns
@@ -1053,6 +1066,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                             'larger than 1. Values have been divided by 100 for use as percentages.')
                 cut_off_list = [i / 100 for i in cut_off_list]
                 break
+    elif cut_off_parameter == name_of_columns[9]:
+        cut_off_list = motility_categories
 
     name_all_categories = 'All'
     if cut_off_parameter == name_of_columns[5]:
@@ -1061,7 +1076,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     else:
         cut_off_precursor = [(a, b, '{:.2f} - {:.2f}'.format(a, b)) for a, b in
                              zip(cut_off_list[:-1], cut_off_list[1:])]
-    cut_off_list = [(np.NINF, np.inf, name_all_categories)]  # So one category contains all values
+    cut_off_list = [(np.NINF, np.inf, name_all_categories)]  # So one x contains all values
     cut_off_list.extend(cut_off_precursor)
 
     # Calculate df_stats_seaborne for statistical plots
@@ -1142,10 +1157,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             cut_off_category=cut_off_category,
             category=category,
             cut_off_list=cut_off_list,
+            verbose=settings['verbose']
         )
-    df['motility_phenotype'].replace(  # name_all_categories is not present and can be skipped
-        {value: key for key, value in zip(['immotile', 'twitching', 'motile'], range(0, 4))},
-        inplace=True)
+
     df_passed_columns = [
         'TRACK_ID', 'POSITION_T', 'POSITION_X', 'POSITION_Y', 'WIDTH', 'HEIGHT', 'DEGREES_ANGLE',
         'angle_diff', 'moving', 'turn_points', 'tp_of_tracks', 'travelled_dist', 'motility_phenotype'
@@ -1171,9 +1185,10 @@ def annotate_video(video_path, df, output_save=True, settings=None, result_folde
     :param output_save: Wheter to display or save the output
     :type output_save: bool
     :param settings: tracking.ini settings
-    :param result_folder: Path to folder in which to save the video file. If None is given, will use video base folder.
-    :param select_subtype: Whether to only display a subtype as set in 'motility_phenotype' column
-        (immotile, twitching, motile).
+    :param result_folder: Path to folder in which to save the video file.
+        If None is given, will use video base folder.
+    :param select_subtype: Whether to only display a subtype as set in '
+        motility_phenotype' column (immotile, twitching, motile).
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
