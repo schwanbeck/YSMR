@@ -6,4 +6,4 @@
 *.xlsx
 *legacy*
 **/*test*
-test/
+ysmr_test/
