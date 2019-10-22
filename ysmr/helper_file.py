@@ -1008,16 +1008,22 @@ def metadata_file(path=None, verbose=False, **kwargs):
     :rtype: dict
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
-    if '_meta.json' not in path:
-        path, _ = os.path.splitext(path)
-        path = '{}_meta.json'.format(path)
+    internal_ext = ['_analysed.csv', '_list.csv', '_selected_data.csv', '_statistics.csv']
+    for ext in internal_ext:
+        if ext in path[-len(ext):]:  # check if internal extension is at end of path
+            path = path[:-len(ext)]
+            break
+    meta_ext = '_meta.json'
+    if meta_ext not in path[-len(meta_ext):]:
+        path = os.path.splitext(path)[0]
+        path = '{}{}'.format(path, meta_ext)
     meta_data = {}
     # also look for metadata file in parent folder
     path_parent, file_name = os.path.split(path)
     path_parent = os.path.join(os.path.dirname(path_parent), file_name)
     for p in [path, path_parent]:
         if verbose:
-            logging.debug('Searching for meta file in path: {}'.format(p))
+            logger.debug('Searching for meta file in path: {}'.format(p))
         try:
             with open(p, 'r') as file:
                 meta_data_unfiltered = json.load(file)
