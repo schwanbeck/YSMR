@@ -247,7 +247,8 @@ def ysmr(paths=None, settings=None, result_folder=None):
         else:
             result_folder = create_results_folder(result_folder)
 
-        pool = mp.Pool()  # get a pool of worker processes per available core
+        # get a pool of worker processes per available core
+        pool = mp.Pool(maxtasksperchild=1)
         for path in paths:
             # Asynchronous calls to track_bacteria() with each path
             results[path] = pool.apply_async(analyse, args=(path, settings, result_folder))
