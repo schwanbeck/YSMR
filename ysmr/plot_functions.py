@@ -255,17 +255,19 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     plt.close()
 
 
-def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=None, dpi=300):
+def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=None, dpi=300, verbose=False):
     """
     Create a violin plot
 
     :param df: pandas data frame
     :param save_path: output save path
-    :param category: category for y-axis
-    :param cut_off_category: category for x-axis
+    :param category: for y-axis
+    :param cut_off_category: for x-axis
     :param cut_off_list: list of names for categories in x-axis
     :param axis: optional matplotlib axis on which to draw
     :param dpi: dpi of image
+    :param verbose: verbose logging
+    :type verbose: bool
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
@@ -326,7 +328,8 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
             )
     if save_fig:
         plt.savefig(save_path, dpi=dpi)
-        logger.debug('Saving figure {}'.format(save_path))
+        if verbose:
+            logger.debug('Saving figure {}'.format(save_path))
         plt.close()
     else:
         return axis
