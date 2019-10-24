@@ -406,11 +406,12 @@ def different_tracks(data, column='TRACK_ID'):
     :rtype stops: list
     """
     track_id = data[column].array
+    index = data.index[:-1].to_numpy()
     # get np.ndarray with the values where track changes occur
     # by comparing every element with the previous one
-    stops = np.where(track_id[:-1] != track_id[1:])[0]
+    stops = index[track_id[:-1] != track_id[1:]]
     stops = stops.tolist()  # convert to list for manipulation
-    starts = [0]  # Initialise starts; track 0 starts at index 0 obviously
+    starts = [data.index.min()]  # Initialise starts with first index
     starts.extend([item + 1 for item in stops])  # others start at stop + 1
     stops.append(data.index.max())  # Append last stop to list of stops
     return starts, stops
