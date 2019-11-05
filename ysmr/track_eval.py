@@ -31,6 +31,8 @@ from ysmr.helper_file import (argrelextrema_groupby, create_results_folder, diff
 from ysmr.plot_functions import angle_distribution_plot, large_xy_plot, rose_graph, violin_plot
 from ysmr.tracker import CentroidTracker
 
+__all__ = ['track_bacteria', 'select_tracks', 'evaluate_tracks', 'annotate_video']
+
 
 def track_bacteria(video_path, settings=None, result_folder=None):
     """
