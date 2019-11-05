@@ -397,11 +397,11 @@ def creation_date(path_to_file):
 
 def different_tracks(data, column='TRACK_ID'):
     """
-    check for changes in column, return lists of starts/stops
+    check for changes in column, return lists of start-/stop-indices
 
-    :param data: pandas data frame
-    :param column: column to be checked for changes
-    :return: list of start IDs, list of stop IDs
+    :param data: pandas.Dataframe
+    :param column: column of Dataframe to be checked for changes
+    :return: list of start indices, list of stop indices
     :rtype starts: list
     :rtype stops: list
     """
