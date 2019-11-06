@@ -814,10 +814,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     original_plot_date = plot_title_name[:12]
     # Add time/date to title of plot; convenience for illiterate supervisors
     if original_plot_date.isdigit() and len(original_plot_date) == 12:
-        plot_title_name = plot_title_name[12:]
         try:
             original_plot_date = strftime('%d. %m. \'%y, %H:%M:%S', strptime(str(original_plot_date), '%y%m%d%H%M%S'))
-            plot_title_name = '{} {}'.format(original_plot_date, plot_title_name)
+            plot_title_name = '{} {}'.format(original_plot_date, plot_title_name[12:])
         except ValueError:
             pass
 
