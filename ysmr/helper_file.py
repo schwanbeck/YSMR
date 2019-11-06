@@ -454,8 +454,11 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
         return None
     if base_path[-1] != '/':
         base_path = '{}/'.format(base_path)
-
-    base_path = '{}**/*{}'.format(base_path, extension)
+    if recursive:
+        search_path = '{}**/*{}'
+    else:
+        search_path = '{}*{}'
+    base_path = search_path.format(base_path, extension)
     in_files = glob(base_path, recursive=recursive)
     out_files = []
     for file in in_files:

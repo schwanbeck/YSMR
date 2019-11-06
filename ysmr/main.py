@@ -193,7 +193,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
     paths_finished = []
     if isinstance(paths, str) or isinstance(paths, os.PathLike):
         paths = [paths]  # convert to list, otherwise for path in paths iterates over characters in string
-    check_logfile(path=settings['log file path'])
+    settings['log file path'] = check_logfile(path=settings['log file path'])
     format_for_logging = get_loggers(
         log_level=settings['log_level'],
         logfile_name=settings['log file path'],
