@@ -1036,9 +1036,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         )
         # df_stats.reindex(columns=name_of_columns)
     # OH GREAT MOTILITY ORACLE, WHAT WILL MY BACTERIAS MOVES BE LIKE?
-    nonmotile = df['motility_phenotype'].where(df['motility_phenotype'] == 0).count() / df.shape[0]
-    twitching = df['motility_phenotype'].where(df['motility_phenotype'] == 1).count() / df.shape[0]
-    motile = df['motility_phenotype'].where(df['motility_phenotype'] == 2).count() / df.shape[0]
+    nonmotile = df['motility_phenotype'].where(
+        df['motility_phenotype'] == motility_categories[0]).count() / df.shape[0]
+    twitching = df['motility_phenotype'].where(
+        df['motility_phenotype'] == motility_categories[1]).count() / df.shape[0]
+    motile = df['motility_phenotype'].where(
+        df['motility_phenotype'] == motility_categories[2]).count() / df.shape[0]
     logger.info('Nonmotile: {:.2%}, twitching: {:.2%}, motile: {:.2%}'.format(nonmotile, twitching, motile))
     q1_time, q2_time, q3_time = np.quantile(df_stats[name_of_columns[3]], (0.25, 0.5, 0.75))  # 'Time (s)',  # 3
     logger.debug('Time duration of selected tracks min: {:.3f}, max: '
