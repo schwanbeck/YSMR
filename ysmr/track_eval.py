@@ -1060,14 +1060,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         cut_off_parameter = name_of_columns[5]
 
     cut_off_list = settings['split violin plots on']
-    if cut_off_parameter == name_of_columns[5]:
-        for i in cut_off_list:
-            if i > 1:
-                logger.info('Violin plots are set to \'perc. motile\', but \'split violin plots on\' contains values '
-                            'larger than 1. Values have been divided by 100 for use as percentages.')
-                cut_off_list = [i / 100 for i in cut_off_list]
-                break
-    elif cut_off_parameter == name_of_columns[9]:
+
+    if cut_off_parameter == name_of_columns[9]:
         cut_off_list = motility_categories
 
     name_all_categories = 'All'
