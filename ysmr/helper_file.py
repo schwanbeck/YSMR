@@ -553,7 +553,6 @@ def get_configs(tracking_ini_filepath=None):
         # if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
         #     _config.read(tracking_ini_filepath)
         if tracking_ini_filepath is None:
-            # tracking_ini_filepath = TRACKING_INI_FILEPATH
             tracking_ini_filepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
         tracking_ini_filepath = os.path.abspath(tracking_ini_filepath)
         _config.read(tracking_ini_filepath)
@@ -598,6 +597,18 @@ def get_configs(tracking_ini_filepath=None):
                 colour_filter = cv2.COLOR_BGR2GRAY
             # convert string to list of floats
             split_on_percentage = [float(i.strip()) for i in results.get('split violin plots on').split(',')]
+            split_results_by = results.get(
+                'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)'
+            )
+            perc_motile_warning = False
+            if (split_results_by.lower() in 'perc. motile') or ('perc. motile' in split_results_by.lower()):
+                if max(split_on_percentage) > 1:
+                    split_results_by = [i / 100 for i in split_on_percentage]
+                    perc_motile_warning = [
+                        'Violin plots are set to \'perc. motile\', but \'split violin plots on\' contains '
+                        'values larger than 1. Values have been divided by 100 for use as percentages.',
+                        'New values: {}'.format(', '.join(map(str, split_on_percentage)))
+                    ]
 
             # one large dict so we can pass it around between functions
             settings_dict = {
@@ -635,9 +646,7 @@ def get_configs(tracking_ini_filepath=None):
                     'store generated statistical .csv file'),
                 'store final analysed .csv file': results.getboolean('store final analysed .csv file'),
                 'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)':
-                    results.get(
-                        'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)'
-                    ),
+                    split_results_by,
                 'split violin plots on': split_on_percentage,
                 'save large plots': results.getboolean('save large plots'),
                 'save rose plot': results.getboolean('save rose plot'),
@@ -699,6 +708,7 @@ def get_configs(tracking_ini_filepath=None):
 
                 # Internal
                 'tracking_ini_filepath': tracking_ini_filepath,
+                'perc_motile_warning': perc_motile_warning,
             }
             if verbose:
                 logger.debug('tracking.ini settings:')
@@ -911,6 +921,9 @@ def log_infos(settings, format_for_logging=None):
         logger.warning('Generated .csv files will be deleted after analysis')
     if settings['select files'] and settings['debugging']:
         logger.warning('Manually selecting files disabled due to debugging')
+    if settings['perc_motile_warning']:
+        for perc_warning in settings['perc_motile_warning']:
+            logger.warning(perc_warning)
 
     # Infos
     logger.info('Settings file location: {}'.format(os.path.abspath(settings['tracking_ini_filepath'])))
