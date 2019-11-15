@@ -277,6 +277,7 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
         fig.set_size_inches(11.6929133858, 8.2677165354)
         axis = fig.add_subplot(111)  # so we have an axis element
         save_fig = True
+    plt.rcParams['axes.axisbelow'] = True
     axis.grid(axis='y',
               which='major',
               # color='gray',
