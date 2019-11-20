@@ -97,6 +97,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
         meta_data = metadata_file(
             # meta.json file will be searched for in provided folder and parent folder
             path=os.path.join(result_folder, os.path.basename(path)),
+            additional_search_paths=path,
             verbose=settings['verbose'],
             fps=fps,
             frame_height=f_height,

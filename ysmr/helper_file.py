@@ -48,7 +48,7 @@ def argrelextrema_groupby(group, comparator=np.greater_equal, order=10, shift_ra
     :param comparator: numpy comparator or equivalent
     :param order: range in which to check for extrema
     :type order: int
-    :param shift_range: range in which to exclude multiple results (0 is off).
+    :param shift_range: range in which to exclude multiple positive results (0 is off).
     :type shift_range: int
     :param fill_value: fill value for array
     :return: group minima/maxima
@@ -147,9 +147,6 @@ def create_configs(config_filepath=None):
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
-    # path = os.path.join(os.path.expanduser("~"), '.config/ysmr')
-    # import xdg -> ~/$XDG_CONFIG_HOME/ysmr
-    # %APPDATA%: path = os.getenv('APPDATA') + ysmr
     if config_filepath is None:
         config_filepath = os.path.join(os.path.abspath('./'), 'tracking.ini')
     try:
@@ -341,9 +338,9 @@ def create_results_folder(path):
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
     dir_form = '{}_Results/'.format(str(strftime('%y%m%d', localtime())))
-    if isinstance(path, str) or isinstance(path, os.PathLike):
+    if isinstance(path, (str, os.PathLike)):
         pass
-    elif isinstance(path, list) or isinstance(path, tuple):
+    elif isinstance(path, (list, tuple)):
         path = path[0]
     else:
         path = './'
@@ -1013,12 +1010,14 @@ def make_dir(new_directory):
             os.mkdir(new_directory)
 
 
-def metadata_file(path=None, verbose=False, **kwargs):
+def metadata_file(path=None, verbose=False, additional_search_paths=None, **kwargs):
     """Reads meta data from file if it exists, update/create file if new ones are provided.
-    Keys with None as value will be removed. meta.json file will be searched for in folder and parent folder.
+    Keys with None as value will be removed. meta.json file will be searched for in folder and parent folder,
+    as well as in any additional_search_paths, if provided.
 
     :param path: path to original file
     :param verbose: print meta.json file path
+    :param additional_search_paths: further path(s) to search _meta.json file in
     :type verbose: bool
     :param kwargs: meta data
     :return: meta data
@@ -1026,29 +1025,42 @@ def metadata_file(path=None, verbose=False, **kwargs):
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
     internal_ext = ['_analysed.csv', '_list.csv', '_selected_data.csv', '_statistics.csv']
-    for ext in internal_ext:
-        if ext in path[-len(ext):]:  # check if internal extension is at end of path
-            path = path[:-len(ext)]
-            break
     meta_ext = '_meta.json'
-    if meta_ext not in path[-len(meta_ext):]:
-        path = os.path.splitext(path)[0]
-        path = '{}{}'.format(path, meta_ext)
     meta_data = {}
+
     # also look for metadata file in parent folder
     path_parent, file_name = os.path.split(path)
     path_parent = os.path.join(os.path.dirname(path_parent), file_name)
-    for p in [path, path_parent]:
+    search_paths = [path, path_parent]
+
+    if additional_search_paths:
+        if isinstance(additional_search_paths, (str, os.PathLike)):
+            search_paths.append(additional_search_paths)
+        else:
+            search_paths.extend(additional_search_paths)
+
+    mod_search_paths = []
+    for curr_path in search_paths:
+        for ext in internal_ext:
+            if ext in curr_path[-len(ext):]:  # check if internal extension is at end of path
+                curr_path = curr_path[:-len(ext)]
+                break
+        if meta_ext not in curr_path[-len(meta_ext):]:
+            curr_path = os.path.splitext(curr_path)[0]
+            curr_path = '{}{}'.format(curr_path, meta_ext)
+        mod_search_paths.append(curr_path)
+
+    for curr_path in mod_search_paths:
         if verbose:
-            logger.debug('Searching for meta file in path: {}'.format(p))
+            logger.debug('Searching for meta file in path: {}'.format(curr_path))
         try:
-            with open(p, 'r') as file:
+            with open(curr_path, 'r') as file:
                 meta_data_unfiltered = json.load(file)
             # clear None values
             meta_data.update({key: val for key, val in meta_data_unfiltered.items() if val is not None})
-            path = p
+            path = curr_path
             break
-        except FileNotFoundError:
+        except (FileNotFoundError, PermissionError):
             pass
     # clear None values
     filtered_kwargs = {key: val for key, val in kwargs.items() if val is not None}
