@@ -1049,6 +1049,7 @@ def metadata_file(path=None, verbose=False, additional_search_paths=None, **kwar
             curr_path = os.path.splitext(curr_path)[0]
             curr_path = '{}{}'.format(curr_path, meta_ext)
         mod_search_paths.append(curr_path)
+    save_path = mod_search_paths[0]
 
     for curr_path in mod_search_paths:
         if verbose:
@@ -1058,7 +1059,7 @@ def metadata_file(path=None, verbose=False, additional_search_paths=None, **kwar
                 meta_data_unfiltered = json.load(file)
             # clear None values
             meta_data.update({key: val for key, val in meta_data_unfiltered.items() if val is not None})
-            path = curr_path
+            save_path = curr_path
             break
         except (FileNotFoundError, PermissionError):
             pass
@@ -1068,7 +1069,7 @@ def metadata_file(path=None, verbose=False, additional_search_paths=None, **kwar
         # So new values overwrite the ones in the file, not vice versa
         meta_data.update(filtered_kwargs)
         try:
-            with open(path, 'w+') as file:
+            with open(save_path, 'w+') as file:
                 json.dump(meta_data, file)
         except (PermissionError, FileNotFoundError) as ex:
             logger.exception(ex)
