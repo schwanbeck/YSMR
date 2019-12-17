@@ -264,6 +264,8 @@ def ysmr(paths=None, settings=None, result_folder=None):
                     paths_finished.append((path, None))
                 else:
                     paths_finished.append((path, item))
+            except (FileNotFoundError, PermissionError,):
+                logger.critical('The file could not be found or opened: {}'.format(path))
             except Exception as exc:
                 logger.critical('An exception of type {0} occurred with path {1}. Arguments:'.format(
                     type(exc).__name__, path))
