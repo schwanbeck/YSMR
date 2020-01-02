@@ -810,12 +810,14 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # @todo: allow user customisation of plot title name?
     # Set up plot title name
     plot_title_name = file_name.replace('_', ' ')
-    plot_title_name = plot_title_name.split(sep='.', maxsplit=1)[0]
+    if '_selected_data' in file_name:
+        plot_title_name = plot_title_name[:-len('_selected_data')]
+    # plot_title_name = plot_title_name.split(sep='.', maxsplit=1)[0]
     original_plot_date = plot_title_name[:12]
-    # Add time/date to title of plot; convenience for illiterate supervisors
+    # Add time/date to title of plot
     if original_plot_date.isdigit() and len(original_plot_date) == 12:
         try:
-            original_plot_date = strftime('%d. %m. \'%y, %H:%M:%S', strptime(str(original_plot_date), '%y%m%d%H%M%S'))
+            original_plot_date = strftime('%d. %m. \'%y,', strptime(str(original_plot_date), '%y%m%d%H%M%S'))
             plot_title_name = '{} {}'.format(original_plot_date, plot_title_name[12:])
         except ValueError:
             pass
@@ -950,10 +952,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     )
 
     motility_categories = ['immotile', 'twitching', 'motile']
+    motility_categories = [i for i in range(len(motility_categories))]
 
-    df['motility_phenotype'].replace(  # replace 0 / 1 / 2 with immotile / twitching / motile
-        {value: key for key, value in zip(motility_categories, range(0, len(motility_categories) + 1))},
-        inplace=True)
+    # df['motility_phenotype'].replace(  # replace 0 / 1 / 2 with immotile / twitching / motile
+    #     {value: key for key, value in zip(motility_categories, range(0, len(motility_categories) + 1))},
+    #     inplace=True)
 
     # Source: ALollz, stackoverflow.com/questions/51064346/
     # Get largest displacement during track
@@ -977,6 +980,18 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                   acr_series / dist_series,
                   0
                   )), index=time_series.index)
+
+    # Remove truning points from immotile tracks
+    df['turn_points'] = np.where(
+        df['motility_phenotype'] != 0,  # If tracks are not immotile
+        df['turn_points'],  # Keep as-is
+        0  # No TP otherwise
+    )
+
+    # Set start of each track as a turning point
+    # This way we can group by turning points afterwards
+    np.put(df['turn_points'], diff_tracks_start, 1)
+
     # Subtract one as each track starts with a TP and multiply by fps;
     # As we'll divide by time afterwards so we can get 1/s if there is one positive in one second
     turn_per_s_series = (df.groupby('TRACK_ID')['turn_points'].agg('sum') - 1) * fps
@@ -993,7 +1008,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             0
         )), index=time_series.index)
     track_id = df.groupby('TRACK_ID')['TRACK_ID'].agg('last')
-    mot_phenotype = df.groupby('TRACK_ID')['pdist_series_max'].agg('last')
+    mot_phenotype = df.groupby('TRACK_ID')['motility_phenotype'].agg('last')
 
     name_of_columns = [
         'Turn Points (TP/s)',  # 0
@@ -1071,6 +1086,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     if cut_off_parameter == name_of_columns[5]:
         cut_off_precursor = [(a, b, '{:.2%} - {:.2%}'.format(a, b)) for a, b in
                              zip(cut_off_list[:-1], cut_off_list[1:])]
+    elif cut_off_parameter == name_of_columns[9]:
+        cut_off_precursor = [(0, 0.001, 'Immotile'), (1, 1.001, 'Twitching'), (2, 2.001, 'Motile'), ]
     else:
         cut_off_precursor = [(a, b, '{:.2f} - {:.2f}'.format(a, b)) for a, b in
                              zip(cut_off_list[:-1], cut_off_list[1:])]
@@ -1133,29 +1150,32 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                        dist_min=distance_min,
                        dist_max=distance_max)
     violin_plots = []
+    # @todo: make limits optional
     if settings['save turning point violin plot']:
-        violin_plots.append((name_of_columns[0], 'turning_points'))
+        violin_plots.append((name_of_columns[0], 'turning_points', 1.75))
     if settings['save length violin plot']:
-        violin_plots.append((name_of_columns[1], 'distance'))
+        violin_plots.append((name_of_columns[1], 'distance', 200))
     if settings['save speed violin plot']:
-        violin_plots.append((name_of_columns[2], 'speed'))
+        violin_plots.append((name_of_columns[2], 'speed', 20))
     if settings['save time violin plot']:
         violin_plots.append((name_of_columns[3], 'time_plot'))
     if settings['save displacement violin plot']:
-        violin_plots.append((name_of_columns[4], 'displacement'))
+        violin_plots.append((name_of_columns[4], 'displacement', 200))
     if settings['save percent motile plot']:
-        violin_plots.append((name_of_columns[5], 'perc_motile'))
+        violin_plots.append((name_of_columns[5], 'perc_motile', 1.))
     if settings['save acr violin plot']:
-        violin_plots.append((name_of_columns[6], 'arc-chord_ratio'))
+        violin_plots.append((name_of_columns[6], 'arc-chord_ratio', 1.))
 
-    for category, plot_name in violin_plots:
+    for category, plot_name, y_max in violin_plots:
         violin_plot(
             df=df_stats_seaborne,
             save_path=save_path.format(plot_name, '.png'),
             cut_off_category=cut_off_category,
             category=category,
             cut_off_list=cut_off_list,
-            verbose=settings['verbose']
+            verbose=settings['verbose'],
+            y_max=y_max,
+            plot_title_name=plot_title_name,
         )
 
     df_passed_columns = [
