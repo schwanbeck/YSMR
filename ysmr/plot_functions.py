@@ -255,7 +255,8 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     plt.close()
 
 
-def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=None, dpi=300, verbose=False):
+def violin_plot(df, save_path, category, cut_off_category, cut_off_list, plot_title_name='\n\n',
+                axis=None, dpi=300, verbose=False, y_min=None, y_max=None, ):
     """
     Create a violin plot
 
@@ -264,19 +265,38 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
     :param category: for y-axis
     :param cut_off_category: for x-axis
     :param cut_off_list: list of names for categories in x-axis
+    :param plot_title_name: plot title
     :param axis: optional matplotlib axis on which to draw
     :param dpi: dpi of image
     :param verbose: verbose logging
+    :param y_min: minimum for y-axis
+    :param y_max: maximum for y-axis
     :type verbose: bool
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
+    # large = 12
+    med = 8
+    small = 6
+    params = {
+        'axes.titlesize': med,
+        'legend.fontsize': med,
+        # 'figure.figsize': (8.2677165354, 2.5),
+        'axes.labelsize': small,
+        # 'axes.titlesize': med,
+        'xtick.labelsize': med,
+        'ytick.labelsize': med,
+        'figure.titlesize': med
+    }
+    plt.rcParams.update(params)
+    plt.style.use('seaborn-whitegrid')
     save_fig = False
     if axis is None:  # in case it's not plotted/saved directly
         fig = plt.figure()
-        fig.set_size_inches(11.6929133858, 8.2677165354)
+        fig.set_size_inches(11.6929133858 / 2, 8.2677165354 / 2)
         axis = fig.add_subplot(111)  # so we have an axis element
         save_fig = True
+    # df_curr = df.loc[df[cut_off_category] != 'All']
     plt.rcParams['axes.axisbelow'] = True
     axis.grid(axis='y',
               which='major',
@@ -295,13 +315,16 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
                    bw=.2,
                    # inner='stick',
                    )
+    axis.set(ylim=(y_min, y_max))
     # Remove top and right border
     sns.despine(ax=axis, offset=0)
     # Empty title so there's 2 lines of space for the text boxes
-    axis.set_title('\n\n')
+    axis.set_title('{}\n\n'.format(plot_title_name))
     # set up data for text boxes
     text_boxes = []
     all_entries = sum(df[cut_off_category] == cut_off_list[0][2])
+    if all_entries == 0:
+        all_entries = df.shape[0]
     for idx_textbox in range(len(cut_off_list)):
         curr_category = cut_off_list[idx_textbox][2]
         curr_entries = sum(df[cut_off_category] == curr_category)
@@ -311,7 +334,7 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
         if np.isnan(median):
             continue
         if all_entries > 0:
-            curr_percentage = curr_entries / all_entries
+            curr_percentage = '{:.1%}'.format(curr_entries / all_entries)
         else:
             curr_percentage = 'error'
         text_boxes.append((curr_category, curr_percentage, median, average))
@@ -320,13 +343,14 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, axis=No
     for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(text_boxes):
         axis.text(
             idx_textbox / len(text_boxes) + 0.015, 1.005,
-            '{}: {:.1%}\nMedian: {:.2f}\nAverage:  {:.2f}'.format(
+            '{}: {}\nMedian: {:.2f}\nAverage:  {:.2f}'.format(
                 curr_category, curr_percentage,
                 qm_plot,
                 average_plot),
             # Set Textbox to relative position instead of absolute xy coordinates (0-1
             transform=axis.transAxes,
-            )
+            size=small,
+        )
     if save_fig:
         plt.savefig(save_path, dpi=dpi)
         if verbose:
