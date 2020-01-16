@@ -23,6 +23,7 @@ from time import strftime, strptime
 import cv2
 import numpy as np
 import pandas as pd
+from scipy.ndimage import binary_propagation
 from scipy.signal import medfilt
 from scipy.spatial import distance as dist
 
@@ -170,35 +171,36 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         blurred = cv2.GaussianBlur(gray, (3, 3), 0)  # blur
 
         # All pixels above curr_threshold are set to 255 (white); others are set to 0
-        if settings['adaptive double threshold']:
+        if settings['adaptive double threshold'] >= 0:
+            # @todo: set kernel size as option
+            kernel_for_thresholding = 11
             # Using adaptive double threshold
             thresh = cv2.adaptiveThreshold(
                 blurred,  # src=
                 255,  # maxValue=
                 cv2.ADAPTIVE_THRESH_GAUSSIAN_C,  # adaptiveMethod=
                 threshold_type,  # thresholdType=
-                11,  # blockSize=
+                kernel_for_thresholding,  # blockSize=
                 # If the inverse is taken it correlates best with the same settings for non-adaptive double threshold
                 (settings['threshold offset for detection'] * -1),  # C= (Offset)
             )
-            mean, stddev = cv2.meanStdDev(gray)
-            if settings['white bacteria on dark background']:
-                curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
-                # total_threshold += curr_frame_threshold
-                # Bacteria are brighter than background
-            else:
-                curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
-
-            threshold_list.append(curr_frame_threshold)
-            curr_threshold = int(sum(threshold_list) / len(threshold_list))
-            if len(threshold_list) > fps_of_file * 5:
-                del threshold_list[0]
-            thresh_for_markers = cv2.threshold(
-                blurred,  # src=
-                curr_threshold * 1.1,  # thresh=
-                255,  # maxval=
-                threshold_type,  # type=
-            )[1]
+            if settings['adaptive double threshold'] > 0:
+                # as above
+                markers_for_thresh = cv2.adaptiveThreshold(
+                    blurred,
+                    255,
+                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    threshold_type,
+                    kernel_for_thresholding,
+                    ((settings['threshold offset for detection'] +
+                      settings['adaptive double threshold']) * -1)
+                )
+                if settings['debugging'] and settings['display video analysis']:
+                    cv2.imshow('Adaptive double threshold markers', markers_for_thresh)
+                thresh = binary_propagation(
+                    markers_for_thresh,
+                    mask=thresh
+                ).astype(np.uint8) * 255
 
         else:
             # Using average gray value of image
@@ -235,7 +237,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                 255,  # maxval=
                 threshold_type,  # type=
             )[1]
-            thresh_for_markers = thresh
 
         # Other threshold variations; proved unnecessary:
         # thresh = cv2.threshold(blurred, 90, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
@@ -253,7 +254,6 @@ def track_bacteria(video_path, settings=None, result_folder=None):
             # cv2.imshow('equ', equ)
             # cv2.imshow('blurred', blurred)
             cv2.imshow('threshold', thresh)
-            cv2.imshow('thresh_markers', thresh_for_markers)
 
         contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # returns image, contours, hierarchy (cv2 v.3.4.5.20); we just care about contours
