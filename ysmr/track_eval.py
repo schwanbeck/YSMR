@@ -111,6 +111,14 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     error_during_read = False  # Set to true if some errors occur; used to restore old list afterwards if it exists
     (objects, degrees) = (None, None)  # reset objects, additional_info (caused errors in the past)
 
+    # Wether the result of the threshold should convert from black to white on the inverse
+    if settings['white bacteria on dark background']:
+        threshold_type = cv2.THRESH_BINARY
+    else:
+        # Simply inverse output (as above)
+        threshold_type = cv2.THRESH_BINARY_INV
+        settings['threshold offset for detection'] = (settings['threshold offset for detection'] * -1)
+
     if settings['debugging'] and settings['display video analysis']:
         # Display first frame in case frame-by-frame analysis is necessary
         ret, frame = cap.read()
@@ -132,16 +140,19 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     #                           (frame_width, frame_height)  # Dimensions
     #                           )
     # # min_frame_count += skip_frames
+
     while True:  # Loop over video
         # if cv2.waitKey(1) & 0xFF == ord('n'):  # frame-by-frame
         timer = cv2.getTickCount()
-        ret, frame = cap.read()  # ret: True/False, depends on whether another frame could be retrieved
+        ret, frame = cap.read()
+        # ret: True/False, depends on whether another frame could be retrieved
         # frame: the actual current frame
 
-        # @todo: skip frames?
         # if curr_frame_count < skip_frames:
         #     continue  # skip frame/jump back to start
         # uMatframe = cv2.UMat(frame)
+        # UMat: should utilise graphics card; tends to slow down the whole thing a lot
+        # gray = cv2.UMat(gray)  # Put after gray conversion
 
         # Stop conditions
         if not ret and (frame_count == curr_frame_count + 1 or  # some file formats skip one frame
@@ -154,74 +165,95 @@ def track_bacteria(video_path, settings=None, result_folder=None):
             error_during_read = settings['stop evaluation on error']
             break
 
-        '''
-        Various attempts to get threshold right:
-        gray -> Threshold direct, threshold fixed at 83 / 68? -> Illumination changes too often
-        gray -> clahe -> Threshold --> can always use same threshold?
-        mean, stddev = cv2.meanStdDev(src[, mean[, stddev[, mask]]]) -> find threshold dynamically works
-        gray -> blurred -> Threshold (standard?)
-        '''
-
         gray = cv2.cvtColor(frame, settings['color filter'])  # Convert to gray scale
 
-        # set threshold adaptively
-        mean, stddev = cv2.meanStdDev(gray)
-        if settings['white bacteria on dark background']:
-            curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
-            # total_threshold += curr_frame_threshold
-            # Bacteria are brighter than background
-        else:
-            curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
-            # total_threshold += curr_frame_threshold
-            # Bacteria are darker than background
-            # It's sadly not simply (255 - threshold)
-        # Non-moving-average version:
-        # curr_threshold = int(total_threshold / (curr_frame_count + 1))  # average input  - skip_frames
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)  # blur
 
-        # 5 s moving average:
-        threshold_list.append(curr_frame_threshold)
-        curr_threshold = int(sum(threshold_list) / len(threshold_list))
-        if len(threshold_list) > fps_of_file * 5:
-            del threshold_list[0]
-
-        if curr_frame_count == settings['minimal frame count']:
-            logger.debug(
-                'Background threshold level: {} (of 255), '
-                'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
-                    curr_threshold, mean.item(), stddev.item(), settings['threshold offset for detection']
-                )
+        # All pixels above curr_threshold are set to 255 (white); others are set to 0
+        if settings['adaptive double threshold']:
+            # Using adaptive double threshold
+            thresh = cv2.adaptiveThreshold(
+                blurred,  # src=
+                255,  # maxValue=
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,  # adaptiveMethod=
+                threshold_type,  # thresholdType=
+                11,  # blockSize=
+                # If the inverse is taken it correlates best with the same settings for non-adaptive double threshold
+                (settings['threshold offset for detection'] * -1),  # C= (Offset)
             )
+            mean, stddev = cv2.meanStdDev(gray)
+            if settings['white bacteria on dark background']:
+                curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
+                # total_threshold += curr_frame_threshold
+                # Bacteria are brighter than background
+            else:
+                curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
+
+            threshold_list.append(curr_frame_threshold)
+            curr_threshold = int(sum(threshold_list) / len(threshold_list))
+            if len(threshold_list) > fps_of_file * 5:
+                del threshold_list[0]
+            thresh_for_markers = cv2.threshold(
+                blurred,  # src=
+                curr_threshold * 1.1,  # thresh=
+                255,  # maxval=
+                threshold_type,  # type=
+            )[1]
+
+        else:
+            # Using average gray value of image
+            mean, stddev = cv2.meanStdDev(gray)
+            if settings['white bacteria on dark background']:
+                curr_frame_threshold = (mean + stddev + settings['threshold offset for detection'])
+                # total_threshold += curr_frame_threshold
+                # Bacteria are brighter than background
+            else:
+                curr_frame_threshold = (mean - stddev - settings['threshold offset for detection'])
+                # total_threshold += curr_frame_threshold
+                # Bacteria are darker than background
+                # It's sadly not simply (255 - threshold)
+            # Non-moving-average version:
+            # curr_threshold = int(total_threshold / (curr_frame_count + 1))  # average input  - skip_frames
+
+            # 5 s moving average:
+            threshold_list.append(curr_frame_threshold)
+            curr_threshold = int(sum(threshold_list) / len(threshold_list))
+            if len(threshold_list) > fps_of_file * 5:
+                del threshold_list[0]
+
+            if curr_frame_count == settings['minimal frame count']:
+                logger.debug(
+                    'Background threshold level: {} (of 255), '
+                    'mean: {:.2f}, std. deviation: {:.2f}, offset: {}'.format(
+                        curr_threshold, mean.item(), stddev.item(), settings['threshold offset for detection']
+                    )
+                )
+
+            thresh = cv2.threshold(
+                blurred,  # src=
+                curr_threshold,  # thresh=
+                255,  # maxval=
+                threshold_type,  # type=
+            )[1]
+            thresh_for_markers = thresh
+
+        # Other threshold variations; proved unnecessary:
+        # thresh = cv2.threshold(blurred, 90, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+
         # various other tries to optimise threshold:
         # blurred = cv2.bilateralFilter(gray, 3, 75, 75)
         # equ = clahe.apply(gray)  # uncomment clahe above; background removal
         # blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         # blurred = cv2.medianBlur(gray, 5)
 
-        # UMat: should utilise graphics card; tends to slow down the whole thing a lot
-        # Presumably because a) my graphics card is rubbish, b) the conversion itself takes too much time,
-        # c) subsequent calculations aren't exactly witchcraft, d) all of the above
-        # gray = cv2.UMat(gray)
-
-        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-
-        if settings['white bacteria on dark background']:
-            # All pixels above curr_threshold are set to 255 (white); others are set to 0
-            thresh = cv2.threshold(blurred, curr_threshold, 255, cv2.THRESH_BINARY)[1]
-        else:
-            # Simply inverse output (as above)
-            thresh = cv2.threshold(blurred, curr_threshold, 255, cv2.THRESH_BINARY_INV)[1]
-
-        # Other threshold variations; proved unnecessary:
-        # thresh = cv2.threshold(blurred, 90, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
-        # thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 1)
-
-        # display individual conversion steps to see which one fucks up
+        # display individual conversion steps to see which one acts up
         if settings['debugging'] and settings['display video analysis']:
             # cv2.imshow('frame', frame)
             # cv2.imshow('gray', gray)
             # cv2.imshow('equ', equ)
             # cv2.imshow('blurred', blurred)
             cv2.imshow('threshold', thresh)
+            cv2.imshow('thresh_markers', thresh_for_markers)
 
         contours = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # returns image, contours, hierarchy (cv2 v.3.4.5.20); we just care about contours
@@ -455,8 +487,12 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary, fra
     if sub_part and recursion < settings['maximal recursion depth']:
         kick_reason_list = [kick_reason]
         for (sub_start, sub_stop) in sub_part:
-            if sub_stop - sub_start + 1 < minimal_length_frames:
-                continue  # Skip to stop unnecessary recursions
+            # Skip to stop unnecessary recursions; < 3 in case of minimal_length_frames == 0
+            if minimal_length_frames < 3:
+                if sub_stop - sub_start + 1 < 3:
+                    continue
+            elif sub_stop - sub_start + 1 < minimal_length_frames:
+                continue
             sub_return_result, kick_reason = find_good_tracks(
                 df_passed=df_passed,
                 lower_boundary=lower_boundary,
@@ -963,7 +999,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
     time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
     motile_total_series = df.groupby('TRACK_ID')['moving'].agg('sum')
-    motile_series = motile_total_series / (time_series + 1)  # off-by-one error
+    motile_series = motile_total_series / (time_series + 1) * 100  # off-by-one error
     time_series = (time_series + 1) / fps  # off-by-one error
     dist_series = df.groupby('TRACK_ID')['travelled_dist'].agg('sum')
     acr_series = np.sqrt(
@@ -1084,7 +1120,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     name_all_categories = 'All'
     if cut_off_parameter == name_of_columns[5]:
-        cut_off_precursor = [(a, b, '{:.2%} - {:.2%}'.format(a, b)) for a, b in
+        cut_off_precursor = [(a, b, '{:.1f}% - {:.1f}%'.format(a, b)) for a, b in
                              zip(cut_off_list[:-1], cut_off_list[1:])]
     elif cut_off_parameter == name_of_columns[9]:
         cut_off_precursor = [(0, 0.001, 'Immotile'), (1, 1.001, 'Twitching'), (2, 2.001, 'Motile'), ]
@@ -1158,11 +1194,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     if settings['save speed violin plot']:
         violin_plots.append((name_of_columns[2], 'speed', 20))
     if settings['save time violin plot']:
-        violin_plots.append((name_of_columns[3], 'time_plot'))
+        violin_plots.append((name_of_columns[3], 'time_plot', settings['limit track length to x seconds']))
     if settings['save displacement violin plot']:
         violin_plots.append((name_of_columns[4], 'displacement', 200))
     if settings['save percent motile plot']:
-        violin_plots.append((name_of_columns[5], 'perc_motile', 1.))
+        violin_plots.append((name_of_columns[5], 'perc_motile', 100.))
     if settings['save acr violin plot']:
         violin_plots.append((name_of_columns[6], 'arc-chord_ratio', 1.))
 
