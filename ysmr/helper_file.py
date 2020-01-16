@@ -27,7 +27,7 @@ from datetime import datetime
 from glob import glob
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
-from time import localtime, strftime
+from time import localtime, strftime, sleep
 from tkinter import filedialog, Tk
 
 import cv2
@@ -220,6 +220,7 @@ def create_configs(config_filepath=None):
         'list save length interval': 10000,
         'save video file extension': '.mp4',
         'save video fourcc codec': 'mp4v',
+        'adaptive double threshold': False,
     }
 
     _config['ADVANCED TRACK DATA ANALYSIS SETTINGS'] = {
@@ -265,7 +266,7 @@ def create_configs(config_filepath=None):
         Accessed last 2019-06-07 13:37:00,101        
         """
         # @todo: untested on mac
-        if os.name is 'nt':  # Windows
+        if os.name == 'nt':  # Windows
             # works with spaces in name whereas subprocess.call(('start', path), shell=True) does not
             response = subprocess.run(('cmd /c start "" "{}"'.format(config_filepath)), stderr=subprocess.PIPE)
         elif sys.platform.startswith('darwin'):  # Mac
@@ -599,12 +600,12 @@ def get_configs(tracking_ini_filepath=None):
             )
             perc_motile_warning = False
             if (split_results_by.lower() in 'perc. motile') or ('perc. motile' in split_results_by.lower()):
-                if max(split_on_percentage) > 1:
-                    split_on_percentage = [i / 100 for i in split_on_percentage]
+                if max(split_on_percentage) == 100:
                     perc_motile_warning = [
-                        'Violin plots are set to \'perc. motile\', but \'split violin plots on\' contains '
-                        'values larger than 1. Values have been divided by 100 for use as percentages.',
-                        'New values: {}'.format(', '.join(map(str, split_on_percentage)))
+                        'Violin plots are set to \'perc. motile\', but \'split violin plots on\' highest '
+                        'value is 100. The lower limit of values are inclusive, while the upper limits are '
+                        'exclusive. If you wish to include values at 100 %, consider setting the highest limit to '
+                        '100.001 or similar.'
                     ]
 
             # one large dict so we can pass it around between functions
@@ -677,6 +678,7 @@ def get_configs(tracking_ini_filepath=None):
                 'list save length interval': adv_video.getint('list save length interval'),
                 'save video file extension': adv_video.get('save video file extension'),
                 'save video fourcc codec': adv_video.get('save video fourcc codec'),
+                'adaptive double threshold': adv_video.getboolean('adaptive double threshold'),
 
                 # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
                 'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
@@ -820,7 +822,7 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
                            '{process:>5}:\t' \
                            '{message}'
     # Sets the global logging format.
-    logging.basicConfig(format=(long_format_logging, ), style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"
+    logging.basicConfig(format=long_format_logging, style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"
     queue_handler = None
     # queue_listener = None
     if len(logger.handlers) > 0:
@@ -1314,6 +1316,7 @@ def stop_logging_queue(logger=None):
                         handler.stop()
         except (AttributeError, TypeError):
             pass
+    sleep(.1)
 
 
 def shutdown(seconds=60):
@@ -1325,7 +1328,7 @@ def shutdown(seconds=60):
     :return: None
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
-    if os.name is 'nt':  # windows
+    if os.name == 'nt':  # windows
         try:
             response = subprocess.run('shutdown -f -s -t {}'.format(seconds), stderr=subprocess.PIPE)
             response.check_returncode()
