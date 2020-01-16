@@ -18,7 +18,6 @@ not, see <http://www.gnu.org/licenses/>.
 import logging
 import multiprocessing as mp
 import os
-import sys
 from datetime import datetime
 from time import sleep
 
@@ -189,7 +188,7 @@ def ysmr(paths=None, settings=None, result_folder=None):
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)  # Get settings
     if settings is None:
-        sys.exit('Fatal error in retrieving tracking.ini')
+        print('Fatal error in retrieving tracking.ini')
     paths_failed = []
     paths_finished = []
     if isinstance(paths, str) or isinstance(paths, os.PathLike):
@@ -207,7 +206,16 @@ def ysmr(paths=None, settings=None, result_folder=None):
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
         result_folder = create_results_folder(path=settings['path to test video'])
-        result = analyse(settings['path to test video'], settings=settings, result_folder=result_folder)
+        path = os.path.expanduser(settings['path to test video'])
+        if not os.path.isfile(path):
+            logger.critical('Path to test video may not exist, attempting anyway: {}'.format(path))
+        else:
+            logger.info('Path: {}'.format(path))
+        result = analyse(
+            path=path,
+            settings=settings,
+            result_folder=result_folder
+        )
         if result:
             paths_finished.append(settings['path to test video'])
         else:
@@ -220,25 +228,27 @@ def ysmr(paths=None, settings=None, result_folder=None):
             if not paths:
                 logger.critical('No files selected.')
                 stop_logging_queue(logger)
-                sys.exit('No files selected.')
+                return None
         else:
             if not paths:
                 paths = [settings['path to test video']]
             logger.info('Test video path selected')
-        # folder_path = os.path.dirname(paths[0])
+        # Expand user if necessary
+        paths_expanded = [os.path.expanduser(path) for path in paths]
+        paths = paths_expanded
         for path in paths:
             logger.debug(path)
         logger.info('Total number of files: {}'.format(len(paths)))
 
         while settings['user input']:  # give user chance to check input
             logger.debug('Waiting for user input.')
-            sleep(0.1)  # So the logger doesn't interfere with user input
+            sleep(.1)  # So the logger doesn't interfere with user input
             event = input('Continue? (Y/N): ')
             if 0 < len(event) < 4:
                 if event[0].lower() == 'n':
                     logger.info('Process aborted.\n')
                     stop_logging_queue(logger)
-                    sys.exit(1)
+                    return None
                 elif event[0].lower() == 'y':
                     logger.debug('User has given it\'s blessing.')
                     break
