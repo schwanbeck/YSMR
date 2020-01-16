@@ -97,7 +97,7 @@ def colour_bar(ax, dist_min, dist_max):
     :param dist_max: maximal value
     :return: matplotlib axis
     """
-    colorbar_map = plt.cm.gist_rainbow
+    colorbar_map = plt.cm.viridis_r
     norm = mpl.colors.Normalize(vmin=dist_min, vmax=dist_max)
     cb = mpl.colorbar.ColorbarBase(ax, cmap=colorbar_map, norm=norm, )
     cb.set_label('\u00B5m')
@@ -167,10 +167,10 @@ def large_xy_plot(df, plot_title_name, save_path, px_to_micrometre=1, dist_min=0
             group.POSITION_Y / px_to_micrometre,
             marker='.',
             label=name,
-            c=plt.cm.gist_rainbow(group.distance_colour),
+            c=plt.cm.viridis_r(group.distance_colour),
             # vmin=distance_min,
             # vmax=distance_max,
-            # cmap=plt.cm.gist_rainbow,
+            # cmap=plt.cm.viridis_r,
             s=1,
             lw=0,
         )
@@ -237,10 +237,10 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
             group.y_norm,
             marker='.',
             label=name,
-            c=plt.cm.gist_rainbow(group.distance_colour),
+            c=plt.cm.viridis_r(group.distance_colour),
             # vmin=distance_min,
             # vmax=distance_max,
-            # cmap=plt.cm.gist_rainbow,
+            # cmap=plt.cm.viridis_r,
             s=1,
             lw=0,
         )
