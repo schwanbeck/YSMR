@@ -220,7 +220,7 @@ def create_configs(config_filepath=None):
         'list save length interval': 10000,
         'save video file extension': '.mp4',
         'save video fourcc codec': 'mp4v',
-        'adaptive double threshold': False,
+        'adaptive double threshold': 2.0,
     }
 
     _config['ADVANCED TRACK DATA ANALYSIS SETTINGS'] = {
@@ -678,7 +678,7 @@ def get_configs(tracking_ini_filepath=None):
                 'list save length interval': adv_video.getint('list save length interval'),
                 'save video file extension': adv_video.get('save video file extension'),
                 'save video fourcc codec': adv_video.get('save video fourcc codec'),
-                'adaptive double threshold': adv_video.getboolean('adaptive double threshold'),
+                'adaptive double threshold': adv_video.getfloat('adaptive double threshold'),
 
                 # _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
                 'maximal consecutive holes': adv_track.getint('maximal consecutive holes'),
