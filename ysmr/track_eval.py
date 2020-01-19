@@ -341,7 +341,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                         (50, 50, 170),  # colour
                         2  # line thickness
                         )
-            cv2.imshow('{}'.format(filename_ext), frame)  # Display the image
+            cv2.imshow('{} unfiltered possible detections'.format(filename_ext), frame)  # Display the image
             if cv2.waitKey(1) & 0xFF == ord('q'):  # Interrupt display on 'q'-keypress
                 error_during_read = True
                 logger.error('Processing file interrupted by user: {}'.format(video_path))
