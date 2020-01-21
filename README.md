@@ -137,6 +137,7 @@ optional argument.
 	+ Accepts 'True' or 'False'.
 + display video analysis : True
 	+ When set to True, the video analysis process will be displayed in a window.
+	+ When 'test settings': 'debugging' is set to true, will also display additional conversion steps.
 	+ Accepts 'True' or 'False'.
 + save video : False
 	+ When set to True, selected tracks will be annotated in the original video.
@@ -170,8 +171,9 @@ optional argument.
 + split results by (turn points / distance / speed / time / displacement / perc. motile) : perc. motile
     + By which sub-category the generated violin plots should be split. The total will always be displayed.
     + Accepts 'turn points', 'distance', 'speed', 'time', 'displacement', and 'perc. motile'.
-+ split violin plots on : 0.0, 20.0, 40.0, 60.0, 80.0, 100.0
++ split violin plots on : 0.0, 20.0, 40.0, 60.0, 80.0, 100.1
     + Values at which the selected category is split.
+    + Lower value is inclusive, upper value is exclusive.
     + Accepts floating point numbers separated by a ','.
 + save large plots : True
 	+ When set to True a plot with an overview of the position of the tracked bacteria throughout the video will be 
@@ -196,7 +198,7 @@ optional argument.
 	+ Accepts 'True' or 'False'.
 + save angle distribution plot / bins: 36
 	+ Setting the value to 0 will disable the angle distribution plot.
-	+ When set to True, a histogram with the specified bins of all degrees 
+	+ When set to True, a histogram with the specified bins of all degrees of direction of travel will be generated.
 	+ Accepts 'True' or 'False'.
 + save displacement violin plot : True
     + When set to true a violin plot of the maximal distance between all measured positions of each bacterium will be
@@ -263,16 +265,16 @@ optional argument.
     + Setting 'debugging' and 'display video analysis' to True displays this intermediary step in an additional frame.
     + A positive value specifies the added offset for the second adaptive threshold.
     + Setting the value to 0 enables simple adaptive thresholding instead.
-    + A negative value will instead disable adaptive thresholding and use simple grey value thresholding instead.
+    + A negative value will instead disable adaptive thresholding and use simple grey mean value thresholding instead.
     + Accepts a floating point number.
 
 ##### ADVANCED TRACK DATA ANALYSIS SETTINGS
 + maximal consecutive holes : 5
-	+ Maximal consecutively missing values in track. If a hole greater than specified is encountered, the track will be 
-	split at the hole and the parts re-analysed.
+	+ Maximal consecutively missing values in track. If a gap in measurements greater than specified is encountered, 
+	the track will be split at the gap and the parts re-analysed.
 	+ Accepts an integer value.
 + maximal empty frames in % : 5.0
-	+ Maximal total percentage of missing values.
+	+ Maximal total percentage of gaps.
 	+ Accepts a floating point number.
 + percent quantiles excluded area : 10.0
 	+ Setting the value to 0 will disable exclusion.
@@ -337,6 +339,7 @@ optional argument.
 ##### HOUSEKEEPING
 + previous directory : ./
 	+ When selecting files, the last specified folder will be used as starting point.
+	+ This is updated automatically.
 	+ Fallback value is './'.
 + shut down after analysis : False
 	+ Attempt to shut down the OS after analysis has finished.
@@ -346,7 +349,7 @@ optional argument.
 + debugging : False
 	+  When set to True, this will directly start with the analysis of the specified test video file. 
 	When display settings: 'display video analysis' is set to True, it will additionally display the 
-	threshold of the analysed video file.
+	thresholding steps of the analysed video file.
 	+ Accepts 'True' or 'False'.
 + path to test video : Q:/test_video.avi
 	+ Accepts text string.
@@ -357,7 +360,7 @@ optional argument.
 @Article{
   doi = {}
   url = {https},
-  year  = {2019},
+  year  = {2020},
   month = {},
   publisher = {},
   author = {},
