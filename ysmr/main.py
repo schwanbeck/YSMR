@@ -206,7 +206,10 @@ def ysmr(paths=None, settings=None, result_folder=None):
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
         result_folder = create_results_folder(path=settings['path to test video'])
-        path = os.path.expanduser(settings['path to test video'])
+        if paths is None:
+            path = os.path.expanduser(settings['path to test video'])
+        else:
+            path = paths[0]
         if not os.path.isfile(path):
             logger.critical('Path to test video may not exist, attempting anyway: {}'.format(path))
         else:
