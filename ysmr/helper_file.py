@@ -1065,7 +1065,8 @@ def metadata_file(path=None, verbose=False, additional_search_paths=None, **kwar
             meta_data.update({key: val for key, val in meta_data_unfiltered.items() if val is not None})
             save_path = curr_path
             break
-        except (FileNotFoundError, PermissionError):
+        except (FileNotFoundError, PermissionError, ValueError):
+            # JSONDecodeerror is a ValueError
             pass
     # clear None values
     filtered_kwargs = {key: val for key, val in kwargs.items() if val is not None}
