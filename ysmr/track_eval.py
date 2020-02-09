@@ -680,7 +680,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     if settings['try to omit motility outliers']:
         df['distance'] = np.sqrt(np.square(df['POSITION_X'].diff()) +
                                  np.square(df['POSITION_Y'].diff())) / df['POSITION_T'].diff()
-        np.put(df['distance'], track_start, 0)
+        df.loc[track_start, ['distance']] = 0
         # @todo: change to groupby
         q1_dist, q3_dist = df['distance'].quantile(q=[0.25, 0.75])  # IQR
         distance_outlier = (q3_dist - q1_dist) * 3 + q3_dist  # outer fence
@@ -786,13 +786,13 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         logger.warning(end_string)
         return None
 
-    # Convert good_track to list for use with np.put
+    # Convert good_track to list
     # (a lot faster than setting slices of np.array to true for some reason)
     df['good_track'] = np.zeros(df.shape[0], dtype=np.int8)
     set_good_track_to_true = []
     for (start, stop) in good_track:
         set_good_track_to_true.extend(range(start, (stop + 1), 1))
-    np.put(df['good_track'], set_good_track_to_true, 1)
+    df.loc[set_good_track_to_true, ['good_track']] = 1
     del set_good_track_to_true
 
     # Reset df to important parts
@@ -868,10 +868,8 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df['y_delta'] = df['POSITION_Y'].diff()
     df['t_delta'] = df['POSITION_T'].diff()
     # Set correct values for track starts
-    np.put(df['x_delta'], diff_tracks_start, 0)
-    np.put(df['y_delta'], diff_tracks_start, 0)
-    np.put(df['t_delta'], diff_tracks_start, 1)
-
+    df.loc[diff_tracks_start, ['x_delta', 'y_delta']] = 0
+    df.loc[diff_tracks_start, ['t_delta']] = 1
     for letter in ['x', 'y', 't']:  # validate
         item = '{}_delta'.format(letter)
         if df[item].isnull().any():  # check if any value is still NaN
@@ -906,7 +904,6 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # median filter the values to spot general null points in movement
     for kernel_size in [3, max_kernel]:
         df['moving'] = df.groupby('TRACK_ID')['moving'].transform(medfilt, kernel_size=kernel_size)
-    # np.put(df['moving'], diff_tracks_start, 0)
 
     angle_diff = settings['compare angle between n frames']
     x_diff_track_for_angle = df.groupby('TRACK_ID')['POSITION_X'].diff(angle_diff)  # .fillna(method='bfill')
@@ -943,7 +940,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # Convert to binary
     df['turn_points'] = np.where(df['turn_points'] == 0, 0, 1).astype(np.int8)
     # start counts as TP so we can later group by TPs
-    np.put(df['turn_points'], diff_tracks_start, 1)
+    df.loc[diff_tracks_start, ['turn_points']] = 1
     # get indices of turning points
     tp_start, _ = different_tracks(df, column='turn_points')
     # as different_tracks returns changes from 1 to 0 and 0 to 1, we need only every other entry
@@ -953,7 +950,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # Create one column in which each TP gets a unique ID
     df['tp_of_tracks'] = np.zeros(df.shape[0], dtype=np.uint64)
     for i, (start, stop) in enumerate(zip(tp_start[:-1], tp_start[1:])):
-        np.put(df['tp_of_tracks'], range(start, stop), i)
+        df.loc[start:stop - 1, ['tp_of_tracks']] = i
     df['tp_of_tracks'] = np.where(df['moving'] == 0, np.nan, df['tp_of_tracks'])
     df['tp_dist'] = df.groupby('tp_of_tracks')['travelled_dist'].transform('sum')
     # limit to 10 or half minimal length in seconds/limit track length to x seconds, whichever is shortest
@@ -1026,7 +1023,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
 
     # Set start of each track as a turning point
     # This way we can group by turning points afterwards
-    np.put(df['turn_points'], diff_tracks_start, 1)
+    df.loc[diff_tracks_start, ['turn_points']] = 1
 
     # Subtract one as each track starts with a TP and multiply by fps;
     # As we'll divide by time afterwards so we can get 1/s if there is one positive in one second
