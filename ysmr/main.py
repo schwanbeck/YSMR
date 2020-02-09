@@ -242,7 +242,8 @@ def ysmr(paths=None, settings=None, result_folder=None):
                 paths = get_any_paths(rename=True, settings=settings)
             if not paths:
                 logger.critical('No files selected.')
-                stop_logging_queue(logger)
+                stop_logging_queue(logger, settings)
+                listener.join()
                 return None
         else:
             if not paths:
@@ -262,7 +263,8 @@ def ysmr(paths=None, settings=None, result_folder=None):
             if 0 < len(event) < 4:
                 if event[0].lower() == 'n':
                     logger.info('Process aborted.\n')
-                    stop_logging_queue(logger)
+                    stop_logging_queue(logger, settings)
+                    listener.join()
                     return None
                 elif event[0].lower() == 'y':
                     logger.debug('User has given it\'s blessing.')
