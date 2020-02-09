@@ -22,14 +22,14 @@ from datetime import datetime
 from time import sleep
 
 from ysmr.helper_file import (check_logfile, collate_results_csv_to_xlsx, create_results_folder, elapsed_time,
-                              get_any_paths, get_configs, get_loggers, log_infos, metadata_file, shutdown,
-                              stop_logging_queue)
+                              get_any_paths, get_configs, get_loggers, log_infos, logging_configurer,
+                              logging_listener, metadata_file, shutdown, stop_logging_queue)
 from ysmr.track_eval import annotate_video, evaluate_tracks, select_tracks, track_bacteria
 
 
 def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
-    """
-    Starts analysis function (evaluate_tracks, select_tracks, track_bacteria), depending on received file type.
+    """Starts analysis function (evaluate_tracks, select_tracks, track_bacteria),
+    depending on received file type / -ending.
     Continues with analysis depending on provided settings.
 
     :param path: path to file
@@ -39,7 +39,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
     :param return_df: whether to return resulting data frame
     :type return_df: bool
     :param kwargs: kwargs will be saved to meta data file (_meta.json)
-    :return: pandas data frame(s), depending on last analysis step
+    :return: pandas data frame(s), depending on last analysis step, bool if return_df is False, None if error occurred
     """
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)
@@ -50,7 +50,8 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
         logfile_name=settings['log file path'],
         short_stream_output=settings['shorten displayed logging output'],
         short_file_output=settings['shorten logfile logging output'],
-        log_to_file=settings['log to file']
+        log_to_file=settings['log to file'],
+        settings=settings,
     )
     logger = logging.getLogger('ysmr').getChild(__name__)
     logger.debug('Starting process. PID: {}'.format(os.getpid()))
@@ -193,16 +194,27 @@ def ysmr(paths=None, settings=None, result_folder=None):
     paths_finished = []
     if isinstance(paths, str) or isinstance(paths, os.PathLike):
         paths = [paths]  # convert to list, otherwise for path in paths iterates over characters in string
+
     settings['log file path'] = check_logfile(path=settings['log file path'])
-    format_for_logging = get_loggers(
+
+    if not settings['debugging']:
+        settings['logging_queue'] = mp.Manager().Queue(-1)
+        listener = mp.Process(target=logging_listener, args=(settings,))
+        listener.start()
+        logging_configurer(settings)
+    else:
+        listener = None
+
+    get_loggers(
         log_level=settings['log_level'],
         logfile_name=settings['log file path'],
         short_stream_output=settings['shorten displayed logging output'],
         short_file_output=settings['shorten logfile logging output'],
-        log_to_file=settings['log to file']
+        log_to_file=settings['log to file'],
+        settings=settings
     )
     logger = logging.getLogger('ysmr').getChild(__name__)
-    filler_for_logger = log_infos(settings=settings, format_for_logging=format_for_logging)
+    filler_for_logger = log_infos(settings=settings)
 
     if settings['debugging']:  # multiprocess can be uncommunicative with errors
         result_folder = create_results_folder(path=settings['path to test video'])
@@ -214,15 +226,15 @@ def ysmr(paths=None, settings=None, result_folder=None):
             logger.critical('Path to test video may not exist, attempting anyway: {}'.format(path))
         else:
             logger.info('Path: {}'.format(path))
-        result = analyse(
+        return analyse(
             path=path,
             settings=settings,
             result_folder=result_folder
         )
-        if result:
-            paths_finished.append(settings['path to test video'])
-        else:
-            paths_failed.append(settings['path to test video'])
+        # if result:
+        #     paths_finished.append(settings['path to test video'])
+        # else:
+        #     paths_failed.append(settings['path to test video'])
 
     else:
         if settings['select files']:
@@ -300,7 +312,8 @@ def ysmr(paths=None, settings=None, result_folder=None):
     if settings['shut down after analysis']:
         shutdown()
     logger.info('Elapsed time: {}\n{}\n'.format(elapsed_time(t_one), filler_for_logger))
-    stop_logging_queue(logger)
+    stop_logging_queue(logger, settings)
+    listener.join()
     return paths_finished
 
 

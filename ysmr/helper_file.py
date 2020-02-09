@@ -27,7 +27,7 @@ from datetime import datetime
 from glob import glob
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
-from time import localtime, strftime, sleep
+from time import localtime, sleep, strftime
 from tkinter import filedialog, Tk
 
 import cv2
@@ -71,8 +71,7 @@ def argrelextrema_groupby(group, comparator=np.greater_equal, order=10, shift_ra
 
 
 def bytes_to_human_readable(number_of_bytes):
-    """
-    Inspired by https://stackoverflow.com/questions/44096473/
+    """Inspired by https://stackoverflow.com/questions/44096473/
     Returns string containing bytes, rounded to 1 decimal place,
     with unit prefix as defined by SI.
 
@@ -93,8 +92,7 @@ def bytes_to_human_readable(number_of_bytes):
 
 
 def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statistics.csv'):
-    """
-    Saves all available csv files ending in the specified csv_extension into one xlsx
+    """Saves all available csv files ending in the specified csv_extension into one .xlsx
 
     :param path: folder with csv files
     :param save_path: output folder
@@ -140,8 +138,7 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
 
 
 def create_configs(config_filepath=None):
-    """
-    generates the tracking.ini config file and tries to open it for editing.
+    """generates the tracking.ini config file and tries to open it for editing.
 
     :param config_filepath: optional file path
     :return: None
@@ -284,9 +281,10 @@ def create_configs(config_filepath=None):
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
-    """
-    Checks if logfile is above specified size and does a rollover if necessary
+    """Checks if logfile is above specified size and does a rollover if necessary
     If not, checks if file is padded with empty lines and adds some if necessary
+    RotatingFileHandler does the same but can't do the
+    rollover when used with multiprocess, so this is our own approximation
 
     :param path: path to logfile
     :param max_size: maximal size of logfile in bytes
@@ -294,8 +292,6 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
     :return: log-file path
     :rtype: str
     """
-    # RotatingFileHandler does the same but can't do the
-    # rollover when used with multiprocess, so we create our own approximation
     if os.path.isfile(path):
         file_size = os.path.getsize(path)
     else:
@@ -331,8 +327,7 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
 
 
 def create_results_folder(path):
-    """
-    creates a dated result folder in provided path
+    """creates a dated result folder in provided path
 
     :param path: path to folder
     :return: path to result folder
@@ -394,8 +389,7 @@ def creation_date(path_to_file):
 
 
 def different_tracks(data, column='TRACK_ID'):
-    """
-    check for changes in column, return lists of start-/stop-indices
+    """check for changes in column, return lists of start-/stop-indices
 
     :param data: pandas.Dataframe
     :param column: column of Dataframe to be checked for changes
@@ -416,8 +410,7 @@ def different_tracks(data, column='TRACK_ID'):
 
 
 def elapsed_time(time_one):
-    """
-    rough measure for elapsed time since time_one
+    """rough measure for elapsed time since time_one
 
     :param time_one: start time
     :return: time difference
@@ -433,8 +426,7 @@ def elapsed_time(time_one):
 
 
 def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursive=True):
-    """
-    Search for files with provided extension in provided path
+    """Search for files with provided extension in provided path
 
     :param base_path: path which is checked for files
     :param extension: extension or ending of files
@@ -477,8 +469,7 @@ def find_paths(base_path, extension, minimal_age=0, maximal_age=np.inf, recursiv
 
 
 def get_any_paths(prev_dir=None, rename=False, file_types=None, settings=None):
-    """
-    Ask user for file selection with a tkinter askopenfilenames.
+    """Ask user for file selection with tkinter askopenfilenames.
 
     :param prev_dir: Folder in which to start search
     :param rename: Whether to rename the previous folder in the config file tracking.ini
@@ -536,8 +527,7 @@ def get_any_paths(prev_dir=None, rename=False, file_types=None, settings=None):
 
 
 def get_configs(tracking_ini_filepath=None):
-    """
-    Read tracking.ini, convert values to usable form and return as dict
+    """Read tracking.ini, convert values to usable form and return as dict
 
     :param tracking_ini_filepath: filepath for tracking.ini
     :return: configs as dict
@@ -730,8 +720,7 @@ def get_configs(tracking_ini_filepath=None):
 
 
 def get_data(csv_file_path, dtype=None, check_sorted=True):
-    """
-    load csv file to pandas data frame
+    """load csv file to pandas data frame
 
     :param csv_file_path: csv file to read
     :param dtype: dict of columns to be loaded and their data types
@@ -790,11 +779,11 @@ def get_data(csv_file_path, dtype=None, check_sorted=True):
     return df
 
 
-def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
-                short_stream_output=False, short_file_output=False, log_to_file=False):
-    """
-    looks if loggers are already set up, creates new ones if they are missing.
-    Workaround for multiprocessing logging.
+def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log', short_stream_output=False,
+                short_file_output=False, log_to_file=False, settings=None):
+    """looks if loggers are already set up, creates new ones if they are missing.
+    Workaround for multiprocessing logging. If a queue is defined in settings,
+    sets up a multiprocessing queue logging instead.
 
     :param log_level: minimal logging level
     :param logfile_name: file for logging.Filehandler
@@ -804,23 +793,22 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
     :type short_file_output: bool
     :param log_to_file: whether to use a logfile
     :type log_to_file: bool
+    :param settings: settings dict from get_configs()
+    :type settings: dict
     :return: longest used logging format
     """
+    if isinstance(settings, dict):
+        if 'logging_queue' in settings:
+            # set up multiprocessing queue logging
+            logging_configurer(settings)
+            return
+
     logger = logging.getLogger('ysmr')
     logger.propagate = False
+
     # Log message setup
-    long_format_logging = '{asctime:}\t' \
-                          '{funcName:15.15}\t' \
-                          '{lineno:>4}\t' \
-                          '{levelname:8.8}\t' \
-                          '{process:>5}:\t' \
-                          '{message}'
-    # '{name:19.19}\t' \  # logger name
-    # '{filename:18:18}\t' \  # file name
-    short_format_logging = '{asctime:}\t' \
-                           '{levelname:8.8}\t' \
-                           '{process:>5}:\t' \
-                           '{message}'
+    long_format_logging, short_format_logging = log_formats()
+
     # Sets the global logging format.
     logging.basicConfig(format=long_format_logging, style='{')  # ISO8601: "%Y-%m-%dT%H:%M:%S%z"
     queue_handler = None
@@ -861,36 +849,44 @@ def get_loggers(log_level=logging.DEBUG, logfile_name='./logfile.log',
             queue_listener = QueueListener(log_queue, stream_handler_logger)
         queue_listener.start()
 
-    # If a file is present the file format trumps stream format as the file will be a permanent record
-    # and I can't figure out how to log different messages per logger in a way that works consistently
-    return_format = long_format_logging
-    if log_to_file and short_file_output:
-        return_format = short_format_logging
-    elif not log_to_file and short_stream_output:
-        return_format = short_format_logging
-    return return_format
+
+def log_formats():
+    """Returns long and short formats for logging
+    :return: long format for logging, short format for logging
+    :rtype long_format_logging: str
+    :rtype short_format_logging: str
+    """
+    long_format_logging = '{asctime:}\t' \
+                          '{funcName:15.15}\t' \
+                          '{lineno:>4}\t' \
+                          '{levelname:8.8}\t' \
+                          '{process:>5}:\t' \
+                          '{message}'
+    # '{name:19.19}\t' \  # logger name
+    # '{filename:18:18}\t' \  # file name
+    short_format_logging = '{asctime:}\t' \
+                           '{levelname:8.8}\t' \
+                           '{process:>5}:\t' \
+                           '{message}'
+    return long_format_logging, short_format_logging
 
 
-def log_infos(settings, format_for_logging=None):
+def log_infos(settings):
     """Logging output for several options set in settings.
 
     :param settings: settings dict from get_configs()
     :type settings: dict
-    :param format_for_logging: logging format string
-    :type format_for_logging: str
     :return: filler for logger
     :rtype: str
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
     # Log some general stuff
-    if format_for_logging is None:
-        format_for_logging = '{asctime:}\t' \
-                             '{name:21.21}\t' \
-                             '{funcName:14.14}\t' \
-                             '{lineno:>4}\t' \
-                             '{levelname:8.8}\t' \
-                             '{process:>5}:\t' \
-                             '{message}'
+    long_format, short_format = log_formats()
+    if (settings['shorten displayed logging output'] and
+        settings['log to file']) or settings['shorten logfile logging output']:
+        format_for_logging = short_format
+    else:
+        format_for_logging = long_format
     explain_logger_setup = format_for_logging.format(**{
         'asctime': 'YYYY-MM-DD HH:MM:SS,mmm',  # ISO8601 'YYYY-MM-DD HH:MM:SS+/-TZ'
         'name': 'logger name',
@@ -961,6 +957,86 @@ def log_infos(settings, format_for_logging=None):
         for key in settings:
             logger.debug('{}: {}'.format(key, settings[key]))
     return filler_for_logger
+
+
+def logging_configurer(settings):
+    """Configure logger
+
+    Taken from:
+    https://github.com/ClayCampaigne/multiprocessing-pool-logging/blob/master/pool_logging.py
+    Accessed last 2020-02-09 13:37:00,101
+    :param settings:
+    :return:
+    """
+    root = logging.getLogger('ysmr')
+    if not len(root.handlers):
+        handler = logging.handlers.QueueHandler(settings['logging_queue'])
+        root.addHandler(handler)
+        # send all messages, for demo; no other level or filter logic applied.
+        root.setLevel(settings['log_level'])
+
+
+def logging_listener_configurer(settings):
+    """ Configures logging handlers for listener queue
+
+    Taken from:
+    https://github.com/ClayCampaigne/multiprocessing-pool-logging/blob/master/pool_logging.py
+    Accessed last 2020-02-09 13:37:00,101
+    :param settings: ysmr settings
+    :type settings: dict
+    :return: None
+    """
+    root = logging.getLogger('ysmr')
+    root.propagate = False
+
+    # Set up formats
+    long_format_logging, short_format_logging = log_formats()
+    logger_formatter_long = logging.Formatter(long_format_logging, style='{')
+    logger_formatter_short = logging.Formatter(short_format_logging, style='{')
+
+    stream_handler = logging.StreamHandler(sys.stdout)
+    if settings['shorten logfile logging output']:
+        stream_handler.setFormatter(logger_formatter_short)
+    else:
+        stream_handler.setFormatter(logger_formatter_long)
+    stream_handler.setLevel(settings['log_level'])
+    root.addHandler(stream_handler)
+
+    if settings['log to file']:
+        file_handler = logging.FileHandler(filename=settings['log file path'], mode='a')
+        if settings['shorten displayed logging output']:
+            file_handler.setFormatter(logger_formatter_short)
+        else:
+            file_handler.setFormatter(logger_formatter_long)
+        file_handler.setLevel(settings['log_level'])
+        root.addHandler(file_handler)
+
+
+def logging_listener(settings):
+    """ Handle logs in queue, stop on None
+
+    Taken from:
+    https://github.com/ClayCampaigne/multiprocessing-pool-logging/blob/master/pool_logging.py
+    Accessed last 2020-02-09 13:37:00,101
+    :param settings: ysmr settings
+    :type settings: dict
+    :return: None
+    """
+    queue = settings['logging_queue']
+    logging_listener_configurer(settings)
+    while True:
+        try:
+            record = queue.get()
+            if record is None:  # We send this as a sentinel to tell the listener to quit.
+                break
+            logger = logging.getLogger(record.name)
+            logger.handle(record)  # No level or filter logic applied - just do it!
+        except Exception:
+            import traceback
+            print('Problem:', file=sys.stderr)
+            traceback.print_exc(file=settings['log file path'])
+            traceback.print_exc(file=sys.stderr)
+            break
 
 
 def logfile_padding(logfile, iteration=0):
@@ -1082,8 +1158,7 @@ def metadata_file(path=None, verbose=False, additional_search_paths=None, **kwar
 
 
 def reshape_result(tuple_of_tuples, *args):
-    """
-    reshape tuple of tuples into (x, y, *args) and (width, height, degrees_orientation)
+    """reshape tuple of tuples into (x, y, *args) and (width, height, degrees_orientation)
 
     :param tuple_of_tuples: (x, y), (w, h), degrees_orientation
     :param args: additional parameters are added to coordinates
@@ -1097,8 +1172,7 @@ def reshape_result(tuple_of_tuples, *args):
 
 
 def save_df_to_csv(df, save_path, rename_old_file=True):
-    """
-    save data frame to csv file
+    """save data frame to csv file
 
     :param df: pandas data frame
     :param save_path: path to csv file
@@ -1135,8 +1209,7 @@ def save_df_to_csv(df, save_path, rename_old_file=True):
 
 
 def save_list(path, result_folder=None, coords=None, first_call=False, rename_old_list=True, illumination=False):
-    """
-    Create csv file for results from track_bacteria(), append results
+    """Create csv file for results from track_bacteria(), append results
 
     :param path: path to video file for first call, path to .csv file otherwise
     :param result_folder: optional path to result folder
@@ -1214,8 +1287,7 @@ def save_list(path, result_folder=None, coords=None, first_call=False, rename_ol
 
 
 def set_different_colour_filter(colour_filter_new):
-    """
-    sets a new cv2 colour filter
+    """sets a new cv2 colour filter
 
     :param colour_filter_new: name of colour filter
     :return: cv2 colour filter
@@ -1247,8 +1319,7 @@ def set_different_colour_filter(colour_filter_new):
 
 
 def shift_np_array(arr, shift, fill_value=np.nan):
-    """
-    preallocate empty array and assign slice of original array, filled with fill_value
+    """preallocate empty array and assign slice of original array, filled with fill_value
     # See origin:
     # https://stackoverflow.com/questions/30399534/shift-elements-in-a-numpy-array
     # Accessed last 2019-04-24 13:37:00,101
@@ -1273,8 +1344,7 @@ def shift_np_array(arr, shift, fill_value=np.nan):
 
 
 def sort_list(file_path=None, sort=None, df=None, save_file=False):
-    """
-    sorts pandas data frame, optionally saves it and loads it from csv
+    """sorts pandas data frame, optionally saves it and loads it from csv
 
     :param file_path: file path to save .csv to
     :param sort: list of columns to sort by, defaults to ['TRACK_ID', 'POSITION_T']
@@ -1307,7 +1377,21 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
     return df
 
 
-def stop_logging_queue(logger=None):
+def stop_logging_queue(logger=None, settings=None):
+    """Attempts to shut down logging handlers.
+    If a multiprocessing.Manager().Queue(-1) is present,
+    sends a None to stop logging_listener().
+
+    :param logger: logging.logger instance
+    :param settings: ysmr settings
+    :return: None
+    """
+    if isinstance(settings, dict):
+        if 'logging_queue' in settings:
+            try:
+                settings['logging_queue'].put(None, True, 5)
+            except settings['logging_queue'].Full:
+                settings['logging_queue'].put_nowait(None)
     logger_list = [logger, logging.getLogger('ysmr').getChild(__name__), logging.getLogger('ysmr')]
     for logger in logger_list:
         try:
@@ -1317,12 +1401,11 @@ def stop_logging_queue(logger=None):
                         handler.stop()
         except (AttributeError, TypeError):
             pass
-    sleep(.1)
+    sleep(.1)  # In case of remaining messages
 
 
 def shutdown(seconds=60):
-    """
-    attempts to shut down the computer
+    """attempts to shut down the computer
 
     :param seconds: seconds before shutdown on windows
     :type seconds: int
