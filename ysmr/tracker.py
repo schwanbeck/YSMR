@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright 2019 Adrian Rosebrock (adrian@pyimagesearch.com)
+Copyright 2019, 2020  Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
+Original Idea by Adrian Rosebrock (adrian@pyimagesearch.com)
 https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/
 ##Explanation
 This file contains the nearest distance tracker code used by YSMR during video analysis.
