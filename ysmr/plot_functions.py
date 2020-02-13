@@ -146,7 +146,7 @@ def large_xy_plot(df, plot_title_name, save_path, px_to_micrometre=1, dist_min=0
     large_plot = plt.subplot(gs[0, :-2])  # xy-centered plots
     dist_bar = plt.subplot(gs[0, -2:])  # distance color-map
     # display initial position as black dots
-    grouped_df = df.groupby('TRACK_ID')['POSITION_X', 'POSITION_Y'].transform('first')
+    grouped_df = df.groupby('TRACK_ID')[['POSITION_X', 'POSITION_Y']].transform('first')
     large_plot.scatter(
         grouped_df.POSITION_X / px_to_micrometre,
         grouped_df.POSITION_Y / px_to_micrometre,
@@ -158,7 +158,7 @@ def large_xy_plot(df, plot_title_name, save_path, px_to_micrometre=1, dist_min=0
     # Group df by TRACK_ID, sort by distance_colour, leave x/y coordinates and colour, plot those
     grouped_df = df.loc[:, ['TRACK_ID', 'distance_colour', 'POSITION_X', 'POSITION_Y', ]].sort_values(
         ['distance_colour'], ascending=False
-    ).groupby('TRACK_ID', sort=False)['POSITION_X', 'POSITION_Y', 'distance_colour']
+    ).groupby('TRACK_ID', sort=False)[['POSITION_X', 'POSITION_Y', 'distance_colour']]
     track_count = 0
     for name, group in grouped_df:
         track_count += 1
@@ -229,7 +229,7 @@ def rose_graph(df, plot_title_name, save_path, dist_min=0, dist_max=None, dpi=30
     grouped_df = df.loc[
                  :, ['TRACK_ID', 'distance_colour', 'x_norm', 'y_norm']
                  ].sort_values(['distance_colour'], ascending=False).groupby(
-        'TRACK_ID', sort=False)['x_norm', 'y_norm', 'distance_colour']
+        'TRACK_ID', sort=False)[['x_norm', 'y_norm', 'distance_colour']]
     # @todo: Circles indicate the mean and 90th percentile net displacements
     for name, group in grouped_df:
         rose_plot.scatter(
