@@ -21,6 +21,8 @@ from collections import OrderedDict
 import numpy as np
 from scipy.spatial import distance as dist
 
+from ysmr.gsff import GaussianSumFIR
+
 
 class CentroidTracker:
     """
@@ -32,15 +34,31 @@ class CentroidTracker:
     Modified by Julian Schwanbeck
     """
 
-    def __init__(self, max_disappeared=50):
+    def __init__(self, max_disappeared=50, fps=30, n_min=0, n_max=None, n_f=3, ):
         # initialize the next unique object ID along with two ordered
         # dictionaries used to keep track of mapping a given object
         # ID to its centroid and number of consecutive frames it has
         # been marked as "disappeared", respectively
+
+        if n_max is None:
+            n_max = fps
+
         self.nextObjectID = 0
         self.objects = OrderedDict()
         self.additional_info = OrderedDict()
+        self.gsff_dict = OrderedDict()
         self.disappeared = OrderedDict()
+        self.gsff = GaussianSumFIR(
+            delta_t=1 / fps,
+            n_min=n_min,
+            n_max=n_max,
+            n_f=n_f,
+            a=None,
+            c=None,
+            likelihood_minimum=10 ** -20,
+            inv_cov=np.linalg.inv(np.eye(2)),
+            x_hat_array_length=2,
+        )
 
         # store the number of maximum consecutive frames a given
         # object is allowed to be marked as "disappeared" until we
@@ -52,6 +70,8 @@ class CentroidTracker:
         # ID to store the centroid
         self.objects[self.nextObjectID] = centroid
         self.additional_info[self.nextObjectID] = additional_info
+        # initialise gsff settings with empty dict
+        self.gsff_dict[self.nextObjectID] = {}
         self.disappeared[self.nextObjectID] = 0
         self.nextObjectID += 1
 
@@ -60,6 +80,7 @@ class CentroidTracker:
         # both of our respective dictionaries
         del self.objects[object_id]
         del self.additional_info[object_id]
+        del self.gsff_dict[object_id]
         del self.disappeared[object_id]
 
     def update(self, rects):
@@ -145,7 +166,6 @@ class CentroidTracker:
                     if row in used_rows or col in used_cols:
                         # continue jumps back to the beginning of the for-loop
                         continue
-                    # @todo: distance check? Currently kicked out in find_good_tracks()/track_eval.py
                     # could be done by setting distance_matrix values > max. travel dist. to NaN?
 
                     # otherwise, grab the object ID for the current row,
@@ -186,5 +206,10 @@ class CentroidTracker:
                 else:
                     for col in unused_cols:
                         self.register(input_centroids[col], additional_info_dict[col])
+        # Return filtered objects, update objects with predictions for next round
+        returns = OrderedDict()
+        for key, val in self.objects.items():
+            returns[key], gsff_settings = self.gsff.correct(measurement=val, **self.gsff_dict[key])
+            self.objects[key], self.gsff_dict[key] = self.gsff.predict(**gsff_settings)
         # return the set of trackable objects
-        return self.objects, self.additional_info
+        return returns, self.additional_info
