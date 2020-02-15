@@ -720,7 +720,18 @@ def get_configs(tracking_ini_filepath=None):
 
 
 def get_data(csv_file_path, dtype=None, check_sorted=True):
-    """load csv file to pandas data frame
+    """load csv file to pandas data frame.
+
+    Default dtype:
+
+    dtype = {
+        'TRACK_ID': np.uint32,
+        'POSITION_T': np.uint32,
+        'POSITION_X': np.float64,
+        'POSITION_Y': np.float64,
+        'WIDTH': np.float64,
+        'HEIGHT': np.float64,
+        'DEGREES_ANGLE': np.float64}
 
     :param csv_file_path: csv file to read
     :param dtype: dict of columns to be loaded and their data types
