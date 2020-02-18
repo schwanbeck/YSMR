@@ -27,7 +27,7 @@ import numpy as np
 
 class GaussianSumFIR:
     """Algorithm 1 from Pak, JM: Gaussian Sum FIR Filtering for 2D Target Tracking
-    (DOI: 10.1007/s12555-018-0938-4) with changes by Julian Schwanbeck and Jerôme
+    (DOI: 10.1007/s12555-018-0938-4) with changes by Jerôme Dretzke and Julian Schwanbeck
     """
 
     def __init__(self, delta_t, n_min=0, n_max=30, n_f=3,
