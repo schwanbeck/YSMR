@@ -28,7 +28,6 @@ from glob import glob
 from logging.handlers import QueueHandler, QueueListener
 from queue import Queue
 from time import localtime, sleep, strftime
-from tkinter import filedialog, Tk
 
 import cv2
 import numpy as np
@@ -185,7 +184,7 @@ def create_configs(config_filepath=None):
         'store generated statistical .csv file': True,
         'store final analysed .csv file': True,
         'split results by (Turn Points / Distance / Speed / Time / Displacement / perc. motile)': 'perc. motile',
-        'split violin plots on': '0.0, 20.0, 40.0, 60.0, 80.0, 100.0',
+        'split violin plots on': '0.0, 20.0, 40.0, 60.0, 80.0, 100.01',
         'save large plots': True,
         'save rose plot': True,
         'save time violin plot': True,
@@ -524,6 +523,13 @@ def get_any_paths(prev_dir=None, rename=False, file_types=None, settings=None):
     logger = logging.getLogger('ysmr').getChild(__name__)
     settings = get_configs(settings)
     _config.read(settings['tracking_ini_filepath'])
+
+    try:  # In case of headless or otherwise non-Tkinter cases
+        from tkinter import filedialog, Tk
+    except ImportError:
+        logger.exception('Cannot import tkinter; files have to be specified manually.')
+        return None
+
     if prev_dir is None:
         try:
             prev_dir = _config['HOUSEKEEPING'].get('previous directory', fallback='./')
