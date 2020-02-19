@@ -213,6 +213,27 @@ optional argument.
 	+ Requires the optional xlsxwriter package.
 	+ Accepts 'True' or 'False'.
 
+##### PLOT Y-AXIS LIMIT
++ Minimal and maximal values for y-axis on plots.
+    + When a limit is given, the y-axis minimal and maximal values are fixed.
+    + When set to 'False', limits will be chosen based on values in the graph.
+    + Accepts a floating point number or 'False'.
+    + Example values:
+        + turning point violin plot min : 0.0
+        + turning point violin plot max : 1.7
+        + length violin plot min : 0.0
+        + length violin plot max : 250.0
+        + speed violin plot min : 0.0
+        + speed violin plot max : 20.0
+        + time violin plot min : 0.0
+        + time violin plot max : False
+        + displacement violin plot min : 0.0
+        + displacement violin plot max : 220.0
+        + percent motile plot min : 0.0
+        + percent motile plot max : 100.0
+        + acr violin plot min : 0.0
+        + acr violin plot max : 1.0
+
 ##### LOGGING SETTINGS
 + log to file : True
 	+ When set to True, the logging output will be saved to a file.
@@ -335,6 +356,34 @@ optional argument.
     + When set to true, uses the fps value provided in the tracking.ini file, instead of attempting to read it from the
     video file.
     + Accepts 'True' or 'False'.
+    
+##### GAUSSIAN-SUM FIR FILTER SETTINGS
++ disable gsff : False
+    + Whether to use the gaussian-sum finite impulse response filter.
+    + For details and origin of the GSFF see Pak JM. Gaussian Sum FIR Filtering for 2D Target Tracking. 
+    DOI: 10.1007/s12555-018-0938-4
+    + Accepts 'True' or 'False'.
++ number of LSFFs: 3
+    + How many least-square finite impulse response filters to use.
+    + Horizons for the filters are calculated in the following way:
+        + `stepsize = (maximum_horizon_size - minimum_horizon_size ) / number_of_LSFFs`
+        + `[lower_end + stepsize * i for i in range(1, number_of_lsffs + 1)]`
+    
+    + Example for default values:
+        + `stepsize = (30 - 0) / 3 = 10`
+        + `filter_horizons = [0 + 10 * 1, 0 + 10 * 2, 0 + 10 * 3] = [10, 20, 30]`
+    
+    + Accepts a positive integer value larger than 1.
++ minimum horizon size: 0
+    + Lower end of frames for least-square finite impulse response filter.
+    + This value will not be included as a horizon size.
+    + See 'number of LSFFs' for explanation and examples.
+    + Accepts a positive integer value larger than 0.
++ maximum horizon size: 30
+    + Longest horizon size in frames for least-square finite impulse response filter.
+    + If set to 'False', will use current fps value instead.
+    + See 'number of LSFFs' for explanation and examples.
+    + Accepts a positive integer value larger than 1 or 'False'.
 
 ##### HOUSEKEEPING
 + previous directory : ./
@@ -347,7 +396,7 @@ optional argument.
 
 ##### TEST SETTINGS
 + debugging : False
-	+  When set to True, this will directly start with the analysis of the specified test video file. 
+	+ When set to True, this will directly start with the analysis of the specified test video file. 
 	When display settings: 'display video analysis' is set to True, it will additionally display the 
 	thresholding steps of the analysed video file.
 	+ Accepts 'True' or 'False'.

@@ -274,6 +274,11 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, plot_ti
     :type verbose: bool
     :return: None
     """
+    # Convert from False to None
+    if y_min is False:
+        y_min = None
+    if y_max is False:
+        y_max = None
     logger = logging.getLogger('ysmr').getChild(__name__)
     # large = 12
     med = 8

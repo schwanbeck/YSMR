@@ -39,8 +39,7 @@ _config = configparser.ConfigParser(allow_no_value=True)
 
 
 def argrelextrema_groupby(group, comparator=np.greater_equal, order=10, shift_range=4, fill_value=0):
-    """
-    Find local minima/maxima in range of order (depending on comparator).
+    """Find local minima/maxima in range of order (depending on comparator).
     When shift is not 0, will only return one result in range of shift.
     Returns array with non-extrema replaced by fil_value
 
@@ -200,6 +199,29 @@ def create_configs(config_filepath=None):
         'collate results csv to xlsx': True,
     }
 
+    _config['PLOT Y-AXIS LIMITS'] = {
+        'turning point violin plot min': 0.0,
+        'turning point violin plot max': False,
+
+        'length violin plot min': 0.0,
+        'length violin plot max': False,
+
+        'speed violin plot min': 0.0,
+        'speed violin plot max': False,
+
+        'time violin plot min': 0.0,
+        'time violin plot max': False,
+
+        'displacement violin plot min': 0.0,
+        'displacement violin plot max': False,
+
+        'percent motile plot min': 0.0,
+        'percent motile plot max': 100.0,
+
+        'acr violin plot min': 0.0,
+        'acr violin plot max': 1.0,
+    }
+
     _config['LOGGING SETTINGS'] = {
         'log to file': True,
         'log file path': './logfile.log',
@@ -236,6 +258,13 @@ def create_configs(config_filepath=None):
         'limit track length exactly': False,
         'compare angle between n frames': 10,
         'force tracking.ini fps settings': False,
+    }
+
+    _config['GAUSSIAN-SUM FIR FILTER SETTINGS'] = {
+        'disable gsff': False,
+        'number of LSFFs': 3,
+        'minimum horizon size': 0,
+        'maximum horizon size': 30,
     }
 
     _config['HOUSEKEEPING'] = {
@@ -324,6 +353,19 @@ def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
         except (FileNotFoundError, FileExistsError, PermissionError):
             pass
     return path
+
+
+def val_to_float_or_false(value):
+    """Convenience function to convert to float or on ValueError return None
+
+    :param value: value
+    :return: float or None
+    """
+    try:
+        value = float(value)
+    except ValueError:
+        value = False
+    return value
 
 
 def create_results_folder(path):
@@ -550,9 +592,11 @@ def get_configs(tracking_ini_filepath=None):
             basic_track = _config['BASIC TRACK DATA ANALYSIS SETTINGS']
             display = _config['DISPLAY SETTINGS']
             results = _config['RESULTS SETTINGS']
+            y_axis_lim = _config['PLOT Y-AXIS LIMITS']
             log_settings = _config['LOGGING SETTINGS']
             adv_video = _config['ADVANCED VIDEO SETTINGS']
             adv_track = _config['ADVANCED TRACK DATA ANALYSIS SETTINGS']
+            gsff = _config['GAUSSIAN-SUM FIR FILTER SETTINGS']
             housekeeping = _config['HOUSEKEEPING']
             test = _config['TEST SETTINGS']
 
@@ -597,6 +641,13 @@ def get_configs(tracking_ini_filepath=None):
                         'exclusive. If you wish to include values at 100 %, consider setting the highest limit to '
                         '100.001 or similar.'
                     ]
+            gsff_max_size = gsff.get('maximum horizon size')
+            try:
+                gsff_max_size = int(gsff_max_size)
+                if not gsff_max_size > 0:
+                    gsff_max_size = None
+            except ValueError:
+                gsff_max_size = None
 
             # one large dict so we can pass it around between functions
             settings_dict = {
@@ -648,6 +699,42 @@ def get_configs(tracking_ini_filepath=None):
                 'save percent motile plot': results.getboolean('save percent motile plot'),
                 'collate results csv to xlsx': results.getboolean('collate results csv to xlsx'),
 
+                # _config['PLOT Y-AXIS LIMITS']
+                'turning point violin plot min': val_to_float_or_false(
+                    y_axis_lim.get('turning point violin plot min')),
+                'turning point violin plot max': val_to_float_or_false(
+                    y_axis_lim.get('turning point violin plot max')),
+
+                'length violin plot min': val_to_float_or_false(
+                    y_axis_lim.get('length violin plot min')),
+                'length violin plot max': val_to_float_or_false(
+                    y_axis_lim.get('length violin plot max')),
+
+                'speed violin plot min': val_to_float_or_false(
+                    y_axis_lim.get('speed violin plot min')),
+                'speed violin plot max': val_to_float_or_false(
+                    y_axis_lim.get('speed violin plot max')),
+
+                'time violin plot min': val_to_float_or_false(
+                    y_axis_lim.get('time violin plot min')),
+                'time violin plot max': val_to_float_or_false(
+                    y_axis_lim.get('time violin plot max')),
+
+                'displacement violin plot min': val_to_float_or_false(
+                    y_axis_lim.get('displacement violin plot min')),
+                'displacement violin plot max': val_to_float_or_false(
+                    y_axis_lim.get('displacement violin plot max')),
+
+                'percent motile plot min': val_to_float_or_false(
+                    y_axis_lim.get('percent motile plot min')),
+                'percent motile plot max': val_to_float_or_false(
+                    y_axis_lim.get('percent motile plot max')),
+
+                'acr violin plot min': val_to_float_or_false(
+                    y_axis_lim.get('acr violin plot min')),
+                'acr violin plot max': val_to_float_or_false(
+                    y_axis_lim.get('acr violin plot max')),
+
                 # _config['LOGGING SETTINGS']
                 'log to file': log_settings.getboolean('log to file'),
                 'log file path': log_settings.get('log file path'),
@@ -687,6 +774,12 @@ def get_configs(tracking_ini_filepath=None):
                 'compare angle between n frames': adv_track.getint('compare angle between n frames'),
                 'force tracking.ini fps settings': adv_track.getboolean('force tracking.ini fps settings'),
 
+                # _config['GAUSSIAN-SUM FIR FILTER SETTINGS']
+                'disable gsff': gsff.getboolean('disable gsff'),
+                'number of LSFFs': gsff.getint('number of LSFFs'),
+                'minimum horizon size': gsff.getint('minimum horizon size'),
+                'maximum horizon size': gsff_max_size,
+
                 # _config['HOUSEKEEPING']
                 'previous directory': housekeeping.get('previous directory', fallback='./'),
                 'shut down after analysis': housekeeping.getboolean('shut down after analysis'),
@@ -699,6 +792,14 @@ def get_configs(tracking_ini_filepath=None):
                 'tracking_ini_filepath': tracking_ini_filepath,
                 'perc_motile_warning': perc_motile_warning,
             }
+
+            # Assertion checks
+            file_text = ' Check tracking.ini file at: {}'.format(tracking_ini_filepath)
+            assert settings_dict['minimum horizon size'] >= 0, \
+                "'minimum horizon size' in 'GAUSSIAN-SUM FIR FILTER SETTINGS' less than 0." + file_text
+            assert settings_dict['number of LSFFs'] > 1, \
+                "'number of LSFFs' in 'GAUSSIAN-SUM FIR FILTER SETTINGS' less than 2." + file_text
+
             if verbose:
                 logger.debug('tracking.ini settings:')
             for test_key in settings_dict:
@@ -709,7 +810,7 @@ def get_configs(tracking_ini_filepath=None):
                     break
                 elif verbose:
                     logger.debug('{}: {}'.format(test_key, settings_dict[test_key]))
-        except (TypeError, ValueError, KeyError) as ex:  # Exception
+        except (TypeError, ValueError, KeyError, AssertionError) as ex:  # Exception
             template = 'An exception of type {0} occurred while attempting to read tracking.ini. Arguments:\n{1!r}'
             logger.exception(template.format(type(ex).__name__, ex.args))
 
@@ -957,6 +1058,18 @@ def log_infos(settings):
     if not settings['maximal recursion depth']:
         logger.info('Tracks will not be split on error as \'maximal recursion depth\' is set to 0. '
                     'This could severely reduce the number of viable tracks.')
+    if settings['disable gsff']:
+        logger.info('GSFF disabled.')
+    else:
+        if settings['maximum horizon size'] is None:
+            max_horizon_size_text = 'FPS will be used.'
+        else:
+            max_horizon_size_text = settings['maximum horizon size']
+        logger.info('GSFF settings: number: {}, minimum: {}, maximum: {}'.format(
+            settings['number of LSFFs'],
+            settings['minimum horizon size'],
+            max_horizon_size_text
+        ))
 
     # Debug messages
     logger.debug('White bacteria on dark background set to {}'.format(
@@ -1045,8 +1158,11 @@ def logging_listener(settings):
         except Exception:
             import traceback
             print('Problem:', file=sys.stderr)
-            traceback.print_exc(file=settings['log file path'])
             traceback.print_exc(file=sys.stderr)
+            try:
+                traceback.print_exc(file=settings['log file path'])
+            except (FileNotFoundError, PermissionError):
+                pass
             break
 
 

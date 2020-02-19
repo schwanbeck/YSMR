@@ -103,7 +103,15 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                                     rename_old_list=settings['rename previous result .csv'],
                                     illumination=settings['include luminosity in tracking calculation'])
     # Save old_list_name for later if it exists; False otherwise
-    ct = CentroidTracker(max_disappeared=fps_of_file)  # Initialise tracker instance
+    ct = CentroidTracker(  # Initialise tracker instance
+        max_disappeared=fps_of_file,
+        use_gsff=not settings['disable gsff'],
+        fps=fps_of_file,
+        n_min=settings['minimum horizon size'],
+        n_max=settings['maximum horizon size'],
+        n_f=settings['number of LSFFs'],
+    )
+
     coords = []  # Empty list to store calculated coordinates
     curr_frame_count = 0
     threshold_list = []
@@ -1183,23 +1191,55 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
                        dist_min=distance_min,
                        dist_max=distance_max)
     violin_plots = []
-    # @todo: make limits optional
     if settings['save turning point violin plot']:
-        violin_plots.append((name_of_columns[0], 'turning_points', 1.75))
-    if settings['save length violin plot']:
-        violin_plots.append((name_of_columns[1], 'distance', 200))
-    if settings['save speed violin plot']:
-        violin_plots.append((name_of_columns[2], 'speed', 20))
-    if settings['save time violin plot']:
-        violin_plots.append((name_of_columns[3], 'time_plot', settings['limit track length to x seconds']))
-    if settings['save displacement violin plot']:
-        violin_plots.append((name_of_columns[4], 'displacement', 200))
-    if settings['save percent motile plot']:
-        violin_plots.append((name_of_columns[5], 'perc_motile', 100.))
-    if settings['save acr violin plot']:
-        violin_plots.append((name_of_columns[6], 'arc-chord_ratio', 1.))
+        violin_plots.append((
+            name_of_columns[0], 'turning_points',
+            settings['turning point violin plot min'],
+            settings['turning point violin plot max'],
+        ))
 
-    for category, plot_name, y_max in violin_plots:
+    if settings['save length violin plot']:
+        violin_plots.append((
+            name_of_columns[1], 'distance',
+            settings['length violin plot min'],
+            settings['length violin plot max'],
+        ))
+
+    if settings['save speed violin plot']:
+        violin_plots.append((
+            name_of_columns[2], 'speed',
+            settings['speed violin plot min'],
+            settings['speed violin plot max'],
+        ))
+
+    if settings['save time violin plot']:
+        violin_plots.append((
+            name_of_columns[3], 'time_plot',
+            settings['time violin plot min'],
+            settings['time violin plot max'],
+        ))
+    if settings['save displacement violin plot']:
+        violin_plots.append((
+            name_of_columns[4], 'displacement',
+            settings['displacement violin plot min'],
+            settings['displacement violin plot max'],
+        ))
+
+    if settings['save percent motile plot']:
+        violin_plots.append((
+            name_of_columns[5], 'perc_motile',
+            settings['percent motile plot min'],
+            settings['percent motile plot max'],
+        ))
+
+    if settings['save acr violin plot']:
+        violin_plots.append((
+            name_of_columns[6], 'arc-chord_ratio',
+            settings['acr violin plot min'],
+            settings['acr violin plot max'],
+        ))
+
+    for category, plot_name, y_min, y_max in violin_plots:
         violin_plot(
             df=df_stats_seaborne,
             save_path=save_path.format(plot_name, '.png'),
@@ -1207,6 +1247,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             category=category,
             cut_off_list=cut_off_list,
             verbose=settings['verbose'],
+            y_min=y_min,
             y_max=y_max,
             plot_title_name=plot_title_name,
         )

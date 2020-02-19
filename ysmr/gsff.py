@@ -80,7 +80,7 @@ class GaussianSumFIR:
             a=a,
             c=c,
             delta_time=delta_t
-        ) for i in self.n_i]
+        ) for i in self.n_i]  # list of least square filters
         self.inv_cov = inv_cov
 
     @staticmethod

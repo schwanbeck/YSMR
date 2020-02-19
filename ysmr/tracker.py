@@ -34,45 +34,51 @@ class CentroidTracker:
     Modified by Julian Schwanbeck
     """
 
-    def __init__(self, max_disappeared=50, fps=30, n_min=0, n_max=None, n_f=3, ):
-        # initialize the next unique object ID along with two ordered
-        # dictionaries used to keep track of mapping a given object
-        # ID to its centroid and number of consecutive frames it has
-        # been marked as "disappeared", respectively
-
-        if n_max is None:
-            n_max = fps
-
-        self.nextObjectID = 0
-        self.objects = OrderedDict()
-        self.additional_info = OrderedDict()
-        self.gsff_dict = OrderedDict()
-        self.disappeared = OrderedDict()
-        self.gsff = GaussianSumFIR(
-            delta_t=1 / fps,
-            n_min=n_min,
-            n_max=n_max,
-            n_f=n_f,
-            a=None,
-            c=None,
-            likelihood_minimum=10 ** -20,
-            inv_cov=np.linalg.inv(np.eye(2)),
-            x_hat_array_length=2,
-        )
-
+    def __init__(self, max_disappeared=50, fps=30, n_min=0,
+                 n_max=None, n_f=3, use_gsff=True):
         # store the number of maximum consecutive frames a given
         # object is allowed to be marked as "disappeared" until we
         # need to deregister the object from tracking
         self.maxDisappeared = max_disappeared
+
+        # Store wether to use the gsff so we can
+        # skip steps involving it
+        self.use_gsff = use_gsff
+
+        # initialize the next unique object ID along with two ordered
+        # dictionaries used to keep track of mapping a given object
+        # ID to its centroid and number of consecutive frames it has
+        # been marked as "disappeared", respectively
+        self.nextObjectID = 0
+        self.objects = OrderedDict()
+        self.additional_info = OrderedDict()
+        self.disappeared = OrderedDict()
+        if self.use_gsff:
+            # When in use, set up the GSFF
+            if n_max is None:
+                n_max = fps
+            self.gsff = GaussianSumFIR(
+                delta_t=1 / fps,
+                n_min=n_min,
+                n_max=n_max,
+                n_f=n_f,
+                a=None,
+                c=None,
+                likelihood_minimum=10 ** -20,
+                inv_cov=np.linalg.inv(np.eye(2)),
+                x_hat_array_length=2,
+            )
+            self.gsff_dict = OrderedDict()
 
     def register(self, centroid, additional_info):
         # when registering an object we use the next available object
         # ID to store the centroid
         self.objects[self.nextObjectID] = centroid
         self.additional_info[self.nextObjectID] = additional_info
-        # initialise gsff settings with empty dict
-        self.gsff_dict[self.nextObjectID] = {}
         self.disappeared[self.nextObjectID] = 0
+        if self.use_gsff:
+            # initialise gsff settings with empty dict
+            self.gsff_dict[self.nextObjectID] = {}
         self.nextObjectID += 1
 
     def deregister(self, object_id):
@@ -80,8 +86,9 @@ class CentroidTracker:
         # both of our respective dictionaries
         del self.objects[object_id]
         del self.additional_info[object_id]
-        del self.gsff_dict[object_id]
         del self.disappeared[object_id]
+        if self.use_gsff:
+            del self.gsff_dict[object_id]
 
     def update(self, rects):
         # check to see if the list of input bounding box rectangles is empty
@@ -207,9 +214,15 @@ class CentroidTracker:
                     for col in unused_cols:
                         self.register(input_centroids[col], additional_info_dict[col])
         # Return filtered objects, update objects with predictions for next round
-        returns = OrderedDict()
-        for key, val in self.objects.items():
-            returns[key], gsff_settings = self.gsff.correct(measurement=val, **self.gsff_dict[key])
-            self.objects[key], self.gsff_dict[key] = self.gsff.predict(**gsff_settings)
-        # return the set of trackable objects
-        return returns, self.additional_info
+        if self.use_gsff:
+            returns = OrderedDict()
+            for key, val in self.objects.items():
+                returns[key], gsff_settings = self.gsff.correct(
+                    measurement=val, **self.gsff_dict[key]
+                )
+                self.objects[key], self.gsff_dict[key] = self.gsff.predict(**gsff_settings)
+            # return the set of tracked and filtered objects
+            return returns, self.additional_info
+        else:
+            # Return unfiltered objects otherwise
+            return self.objects, self.additional_info
