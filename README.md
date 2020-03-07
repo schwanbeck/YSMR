@@ -23,6 +23,8 @@ Optional:
         + empty
     + \_\_version\_\_.py
         + version file
+    + gsff.py
+        + the gaussian-sum finite impulse response filter used by YSMR
     + helper_file.py
         + contains various functions used throughout YSMR
     + main.py
