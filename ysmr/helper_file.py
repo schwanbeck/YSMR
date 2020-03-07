@@ -1000,8 +1000,8 @@ def log_infos(settings):
     logger = logging.getLogger('ysmr').getChild(__name__)
     # Log some general stuff
     long_format, short_format = log_formats()
-    if (settings['shorten displayed logging output'] and
-        settings['log to file']) or settings['shorten logfile logging output']:
+    if (settings['shorten displayed logging output'] and settings['log to file']) \
+            or settings['shorten logfile logging output']:
         format_for_logging = short_format
     else:
         format_for_logging = long_format
@@ -1039,15 +1039,44 @@ def log_infos(settings):
             logger.warning(perc_warning)
 
     # Infos
-    logger.info('Settings file location: {}'.format(os.path.abspath(settings['tracking_ini_filepath'])))
+    logger.info('Settings file location: {}'.format(
+        os.path.abspath(settings['tracking_ini_filepath'])))
     if settings['log to file']:
-        logger.info('Logfile location: {}'.format(os.path.abspath(settings['log file path'])))
+        logger.info('Logfile location: {}'.format(
+            os.path.abspath(settings['log file path'])))
     if settings['verbose']:
         logger.info('Verbose enabled, logging set to debug.')
     else:
-        logger.info('Log level set to {}'.format(settings['set logging level (debug/info/warning/critical)']))
+        logger.info('Log level set to {}'.format(
+            settings['set logging level (debug/info/warning/critical)']))
     if settings['display video analysis']:
         logger.info('Displaying videos')
+    if settings['adaptive double threshold'] > 0:
+        logger.info(
+            'Using adaptive double threshold: initial threshold '
+            'offset: {}; threshold offset for markers: {}'.format(
+                settings['threshold offset for detection'],
+                settings['adaptive double threshold'] +
+                settings['threshold offset for detection']
+            ))
+    elif settings['adaptive double threshold'] == 0:
+        logger.info('Using single adaptive threshold, offset: {}'.format(
+            settings['threshold offset for detection']))
+    else:
+        logger.info('Using average gray value based thresholding. Offset: {}'.format(
+            settings['threshold offset for detection']))
+    if settings['disable gsff']:
+        logger.info('GSFF disabled.')
+    else:
+        if settings['maximum horizon size'] is None:
+            max_horizon_size_text = 'FPS will be used.'
+        else:
+            max_horizon_size_text = settings['maximum horizon size']
+        logger.info('GSFF settings: number: {}, minimum: {}, maximum: {}'.format(
+            settings['number of LSFFs'],
+            settings['minimum horizon size'],
+            max_horizon_size_text
+        ))
     if settings['save video']:
         logger.info('Saving detection video files')
     if settings['include luminosity in tracking calculation']:
@@ -1062,20 +1091,9 @@ def log_infos(settings):
     else:
         logger.info('Full track length will be used in evaluation')
     if not settings['maximal recursion depth']:
-        logger.info('Tracks will not be split on error as \'maximal recursion depth\' is set to 0. '
+        logger.info('Tracks will not be split on error as '
+                    '\'maximal recursion depth\' is set to 0. '
                     'This could severely reduce the number of viable tracks.')
-    if settings['disable gsff']:
-        logger.info('GSFF disabled.')
-    else:
-        if settings['maximum horizon size'] is None:
-            max_horizon_size_text = 'FPS will be used.'
-        else:
-            max_horizon_size_text = settings['maximum horizon size']
-        logger.info('GSFF settings: number: {}, minimum: {}, maximum: {}'.format(
-            settings['number of LSFFs'],
-            settings['minimum horizon size'],
-            max_horizon_size_text
-        ))
 
     # Debug messages
     logger.debug('White bacteria on dark background set to {}'.format(
@@ -1095,8 +1113,10 @@ def logging_configurer(settings):
     Taken from:
     https://github.com/ClayCampaigne/multiprocessing-pool-logging/blob/master/pool_logging.py
     Accessed last 2020-02-09 13:37:00,101
-    :param settings:
-    :return:
+
+    :param settings: ysmr settings
+    :type settings: dict
+    :return: None
     """
     root = logging.getLogger('ysmr')
     if not len(root.handlers):
@@ -1112,6 +1132,7 @@ def logging_listener_configurer(settings):
     Taken from:
     https://github.com/ClayCampaigne/multiprocessing-pool-logging/blob/master/pool_logging.py
     Accessed last 2020-02-09 13:37:00,101
+
     :param settings: ysmr settings
     :type settings: dict
     :return: None
