@@ -800,11 +800,19 @@ def get_configs(tracking_ini_filepath=None):
             }
 
             # Assertion checks
-            file_text = ' Check tracking.ini file at: {}'.format(tracking_ini_filepath)
+            check_file_text = ' Check tracking.ini file at: {}'.format(tracking_ini_filepath)
             assert settings_dict['minimum horizon size'] >= 0, \
-                "'minimum horizon size' in 'GAUSSIAN-SUM FIR FILTER SETTINGS' less than 0." + file_text
+                "'minimum horizon size' in 'GAUSSIAN-SUM FIR FILTER SETTINGS' less than 0." + check_file_text
             assert settings_dict['number of LSFFs'] > 1, \
-                "'number of LSFFs' in 'GAUSSIAN-SUM FIR FILTER SETTINGS' less than 2." + file_text
+                "'number of LSFFs' in 'GAUSSIAN-SUM FIR FILTER SETTINGS' less than 2." + check_file_text
+            assert settings_dict['frames per second'] > 0, \
+                "'frames per second' in 'BASIC RECORDING SETTINGS' zero or negative." + check_file_text
+            assert settings_dict['pixel per micrometre'] > 0, \
+                "'pixel per micrometre' in 'BASIC RECORDING SETTINGS' zero or negative." + check_file_text
+            assert settings_dict['frame height'] > 0, \
+                "'frame height' in 'BASIC RECORDING SETTINGS' zero or negative." + check_file_text
+            assert settings_dict['frame width'] > 0, \
+                "'frame width' in 'BASIC RECORDING SETTINGS' zero or negative." + check_file_text
 
             if verbose:
                 logger.debug('tracking.ini settings:')
