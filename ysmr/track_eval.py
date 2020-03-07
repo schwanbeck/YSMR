@@ -189,7 +189,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                 cv2.ADAPTIVE_THRESH_GAUSSIAN_C,  # adaptiveMethod=
                 threshold_type,  # thresholdType=
                 kernel_for_thresholding,  # blockSize=
-                # If the inverse is taken it correlates best with the same settings for non-adaptive double threshold
+                # If the negative is taken it correlates best with the same settings for non-adaptive double threshold
                 (settings['threshold offset for detection'] * -1),  # C= (Offset)
             )
             if settings['adaptive double threshold'] > 0:
@@ -278,6 +278,8 @@ def track_bacteria(video_path, settings=None, result_folder=None):
         rects = []  # List of bounding rectangles in the current thresholded frame
         for contour in contours:
             reichtangle = cv2.minAreaRect(contour)
+            # cv2.minAreaRect returns ((x, y), (w, h), degrees)
+
             if settings['include luminosity in tracking calculation']:
                 box = np.int0(cv2.boxPoints(reichtangle))
                 # must be generated for each object as cv2.fillpoly() changes it's input
@@ -296,6 +298,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
 
             if settings['display video analysis']:  # or settings['save video']:  # Display bounding boxes
                 box = np.int0(cv2.boxPoints(reichtangle))
+                # Box: 4 x/y coordinates
                 cv2.drawContours(frame, [box], -1, (255, 0, 0), 0)
 
         objects, wh_degrees = ct.update(rects)  # Calls CentroidTracker.update() from tracker.py
