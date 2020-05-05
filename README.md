@@ -406,21 +406,28 @@ optional argument.
 	+ Accepts text string.
 
 ## Citation
-
 ```
-@Article{
-  doi = {}
-  url = {https},
-  year  = {2020},
-  month = {},
-  publisher = {},
-  author = {},
-  editor = {},
-  title = {},
-  journal = {}
+@article{Schwanbeck2020,
+abstract = {BACKGROUND Motility in bacteria forms the basis for taxis and is in some pathogenic bacteria important for virulence. Video tracking of motile bacteria allows the monitoring of bacterial swimming behaviour and taxis on the level of individual cells, which is a prerequisite to study the underlying molecular mechanisms. RESULTS The open-source python program YSMR (Your Software for Motility Recognition) was designed to simultaneously track a large number of bacterial cells on standard computers from video files in various formats. In order to cope with the high number of tracked objects, we use a simple detection and tracking approach based on grey-value and position, followed by stringent selection against suspicious data points. The generated data can be used for statistical analyses either directly with YSMR or with external programs. CONCLUSION In contrast to existing video tracking software, which either requires expensive computer hardware or only tracks a limited number of bacteria for a few seconds, YSMR is an open-source program which allows the 2-D tracking of several hundred objects over at least 5 minutes on standard computer hardware. The code is freely available at https://github.com/schwanbeck/YSMR.},
+author = {Schwanbeck, Julian and Oehmig, Ines and Dretzke, Jer{\^{o}}me and Zautner, Andreas E and Gro{\ss}, Uwe and Bohne, Wolfgang},
+doi = {10.1186/s12859-020-3495-9},
+issn = {1471-2105},
+journal = {BMC Bioinformatics},
+keywords = {2D object tracking,Bacterial motility,Multi-object tracking,Open-source software,Python,Video microscopy,Video tracking,openCV},
+month = {apr},
+number = {1},
+pages = {166},
+pmid = {32349658},
+publisher = {BMC Bioinformatics},
+title = {{YSMR: a video tracking and analysis program for bacterial motility.}},
+url = {https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-020-3495-9 http://www.ncbi.nlm.nih.gov/pubmed/32349658},
+volume = {21},
+year = {2020}
 }
 ```
 
 ## Acknowledgements
+We would like to thank Prof. Burkhard Morgenstern for reading the manuscript and supporting the project. 
+We would like to thank Avril von Hoyningen-Huene for proofreading and providing corrections for the manuscript.
 The original tracker.py was taken with permission from Adrian Rosebrock (adrian@pyimagesearch.com) from 
 https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/
