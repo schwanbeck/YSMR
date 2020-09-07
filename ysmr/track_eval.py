@@ -1005,6 +1005,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     # Source: ALollz, stackoverflow.com/questions/51064346/
     # Get largest displacement during track
     pdist_series = df.groupby('TRACK_ID').apply(lambda l: dist.pdist(np.array(list(zip(l.x_norm, l.y_norm)))).max())
+    # lambda l: np.nanmax(
+    #             dist.pdist(
+    #                 np.array(list(zip(l.x_norm, l.y_norm)))
+    #             )
+    #         )
     time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
     motile_total_series = df.groupby('TRACK_ID')['moving'].agg('sum')
     motile_series = motile_total_series / (time_series + 1) * 100  # off-by-one error
