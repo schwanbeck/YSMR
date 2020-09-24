@@ -20,13 +20,13 @@ URL = 'https://github.com/schwanbeck/YSMR'
 EMAIL = 'julian.schwanbeck@med.uni-goettingen.de'
 AUTHOR = 'Julian Schwanbeck'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
     'matplotlib>=3.1.0',
     'numpy>=1.16.4',
-    'opencv-python>=3.4.1',
+    'opencv-contrib-python>=3.4.1',
     'pandas>=0.24.2',
     'scipy>=1.3.0',
     'seaborn>=0.9.0',

@@ -128,7 +128,7 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
             file_name = os.path.basename(path)
             file_name = os.path.splitext(file_name)[0]
             # Limit max rows and sheet name length
-            df.loc[:2**20 - 1, :].to_excel(writer, sheet_name=file_name[:31])
+            df.loc[:2 ** 20 - 1, :].to_excel(writer, sheet_name=file_name[:31])
         writer.save()
         logger.info('Collated results: {}'.format(os.path.abspath(file_path)))
     else:
@@ -298,14 +298,16 @@ def create_configs(config_filepath=None):
             response = subprocess.call(('open', config_filepath), stderr=subprocess.PIPE)
         else:  # Linux
             response = subprocess.call(('xdg-open', config_filepath), stderr=subprocess.PIPE)
-        response.check_returncode()
+        try:
+            response.check_returncode()
+        except AttributeError:
+            pass
     except (subprocess.CalledProcessError, FileNotFoundError, OSError) as file_open_error:
         logger.exception(file_open_error)
     finally:
         # As the file has to be checked first and the process could
         # continue with a freshly generated one, we'll stop execution here.
         logger.critical('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
-        sys.exit('Created new tracking.ini. Please check the values in the file: {}'.format(config_filepath))
 
 
 def check_logfile(path, max_size=2 ** 20):  # max_size=1 MB
@@ -868,27 +870,28 @@ def get_data(csv_file_path, dtype=None, check_sorted=True):
     finally:
         pass
     if dtype is None:
-        dtype = {'TRACK_ID': np.uint32,
-                 'POSITION_T': np.uint32,
-                 # up to ~4 * 10**9 data points; value must be pos.
-                 'POSITION_X': np.float64,
-                 'POSITION_Y': np.float64,
-                 'WIDTH': np.float64,
-                 'HEIGHT': np.float64,
-                 'DEGREES_ANGLE': np.float64
-                 }
+        dtype = {
+            'TRACK_ID': np.uint32,  # up to ~4 * 10**9 data points; value must be pos.
+            'POSITION_T': np.uint32,
+            'POSITION_X': np.float64,
+            'POSITION_Y': np.float64,
+            'WIDTH': np.float64,
+            'HEIGHT': np.float64,
+            'DEGREES_ANGLE': np.float64
+        }
     use_cols = list(dtype.keys())
     try:
         # Fixes some special character problems with pd.read_csv paths:
         with open(csv_file_path, 'r', newline='\n') as csv:
             # csv_chunks =  # use chunks in case file is too large
             # Done automatically by pd.read_csv()
-            df = pd.read_csv(csv,
-                             sep=',',  # as is default
-                             header=0,  # as is default
-                             usecols=use_cols,
-                             dtype=dtype,
-                             )
+            df = pd.read_csv(
+                csv,
+                sep=',',  # as is default
+                header=0,  # as is default
+                usecols=use_cols,
+                dtype=dtype,
+            )
     except ValueError as val_error:
         logger.exception(val_error, '\n Error: Invalid file type: {}'.format(csv_file_path))
         return None
@@ -1023,10 +1026,9 @@ def log_infos(settings):
         'process': 'PID',
         'message': 'Message (lNr: line number, PID: Process ID)'
     })
-    filler_for_logger = ''
-    for sub_string in explain_logger_setup.split('\t'):  # create filler with '#' and correct tab placement
-        filler_for_logger += '#' * len(sub_string) + '\t'
-    filler_for_logger = filler_for_logger[:-1]  # remove last tab
+
+    # create filler with '#' and correct tab placement
+    filler_for_logger = '\t'.join('#' * len(i) for i in explain_logger_setup.split('\t'))
     logger.info('Explanation\n{0}\n{1}\n{0}'.format(filler_for_logger, explain_logger_setup))
 
     # Warnings
@@ -1588,12 +1590,18 @@ def shutdown(seconds=60):
     else:
         try:
             response = subprocess.run('systemctl poweroff', stderr=subprocess.PIPE)
-            response.check_returncode()
+            try:
+                response.check_returncode()
+            except AttributeError:
+                pass
             logger.warning('Calling \'systemctl poweroff\' on system.')
         except (OSError, FileNotFoundError, subprocess.CalledProcessError):
             try:
                 response = subprocess.run('sudo shutdown -h +1', stderr=subprocess.PIPE)
-                response.check_returncode()
+                try:
+                    response.check_returncode()
+                except AttributeError:
+                    pass
                 logger.warning('Calling \'sudo shutdown -h +1\' on system.')
             except (OSError, FileNotFoundError, subprocess.CalledProcessError) as os_shutdown_error:
                 logger.exception('Error during shutdown: {}'.format(os_shutdown_error))
