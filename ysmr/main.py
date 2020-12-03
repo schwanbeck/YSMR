@@ -26,6 +26,8 @@ from ysmr.helper_file import (check_logfile, collate_results_csv_to_xlsx, create
                               logging_listener, metadata_file, shutdown, stop_logging_queue)
 from ysmr.track_eval import annotate_video, evaluate_tracks, select_tracks, track_bacteria
 
+__all__ = ['analyse', 'ysmr']
+
 
 def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
     """Starts analysis function (evaluate_tracks, select_tracks, track_bacteria),
@@ -170,7 +172,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
     return return_value
 
 
-def ysmr(paths=None, settings=None, result_folder=None):
+def ysmr(paths=None, settings=None, result_folder=None, multiprocess=False):
     """
     Starts asynchronous multiprocessing of provided video file(s) with analyse().
     Due to the use of multiprocessing, ysmr() should be called in a
@@ -183,6 +185,9 @@ def ysmr(paths=None, settings=None, result_folder=None):
     :type paths: str, list, os.PathLike
     :param result_folder: path to result folder, if not provided, one will be created in first path folder
     :type result_folder: str, list, os.PathLike
+    :param multiprocess: Whether to run as multiprocess or not. Requires to be run in main block or forked process
+     - may lead to unexpected behaviour otherwise.
+    :type multiprocess: bool
     :return: list of (finished path, results)
     :rtype paths_finished: list
     """
@@ -231,10 +236,6 @@ def ysmr(paths=None, settings=None, result_folder=None):
             settings=settings,
             result_folder=result_folder
         )
-        # if result:
-        #     paths_finished.append(settings['path to test video'])
-        # else:
-        #     paths_failed.append(settings['path to test video'])
 
     else:
         if settings['select files']:
@@ -276,16 +277,23 @@ def ysmr(paths=None, settings=None, result_folder=None):
             result_folder = create_results_folder(result_folder)
 
         # get a pool of worker processes per available core
-        pool = mp.Pool(maxtasksperchild=1)
-        for path in paths:
-            # Asynchronous calls to track_bacteria() with each path
-            results[path] = pool.apply_async(analyse, args=(path, settings, result_folder))
-        pool.close()
-        pool.join()
-
+        if multiprocess:
+            mp.set_start_method('spawn')
+            pool = mp.Pool(maxtasksperchild=1)
+            for path in paths:
+                # Asynchronous calls to track_bacteria() with each path
+                results[path] = pool.apply_async(analyse, args=(path, settings, result_folder))
+            pool.close()
+            pool.join()
+        else:
+            for path in paths:
+                results[path] = analyse(path=path, settings=settings, result_folder=result_folder)
         for path, item in results.items():
             try:
-                result = item.get()
+                if multiprocess:
+                    result = item.get()
+                else:
+                    result = item
                 if result is None:
                     paths_failed.append(path)
                     paths_finished.append((path, None))
