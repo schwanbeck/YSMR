@@ -56,10 +56,10 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
         settings=settings,
     )
     logger = logging.getLogger('ysmr').getChild(__name__)
-    logger.debug('Starting process. PID: {}'.format(os.getpid()))
     return_value = None
     if result_folder is None:
         result_folder = create_results_folder(path)
+    logger.debug('Starting process. PID: {} Result folder: {}'.format(os.getpid(), result_folder))
     # path = os.path.realpath(path)
     # See if we need to evaluate for anything, otherwise we'll skip evaluate_tracks()
     plots_eval = any([
@@ -74,7 +74,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
         settings['save speed violin plot'],
         settings['save angle distribution plot / bins'],
         settings['collate results csv to xlsx'],
-        settings['save video']
+        settings['save video'],
     ])
     # set values to None
     df, fps, f_height, f_width, csv_file = [None] * 5
@@ -148,7 +148,7 @@ def analyse(path, settings=None, result_folder=None, return_df=False, **kwargs):
                     '\'save video\' setting is enabled but .csv file was provided. Video can only be annotated '
                     'when ysmr() is given a video as an argument. Optionally use annotate_video() from '
                     'ysmr.track_eval directly.')
-        # if nothing is selected for evaluation and it's specifically a selected_data.csv, something seems wrong
+        # if nothing is selected for evaluation, and it's specifically a selected_data.csv, something seems wrong
         elif 'selected_data.csv' in path:
             logger.warning('No evaluation set to True in settings. Did not evaluate {}'.format(path))
         break  # all is well
@@ -273,12 +273,12 @@ def ysmr(paths=None, settings=None, result_folder=None, multiprocess=False):
         results = {}
         if result_folder is None:
             result_folder = create_results_folder(paths[0])
-        else:
-            result_folder = create_results_folder(result_folder)
+        if not os.path.isdir(result_folder):
+            os.makedirs(result_folder, exist_ok=True)
 
         # get a pool of worker processes per available core
         if multiprocess:
-            mp.set_start_method('spawn')
+            # mp.set_start_method('spawn')
             pool = mp.Pool(maxtasksperchild=1)
             for path in paths:
                 # Asynchronous calls to track_bacteria() with each path

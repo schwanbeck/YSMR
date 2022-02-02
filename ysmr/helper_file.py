@@ -842,13 +842,14 @@ def get_data(csv_file_path, dtype=None, check_sorted=True):
     Default dtype:
 
     dtype = {
-        'TRACK_ID': np.uint32,
-        'POSITION_T': np.uint32,
-        'POSITION_X': np.float64,
-        'POSITION_Y': np.float64,
-        'WIDTH': np.float64,
-        'HEIGHT': np.float64,
-        'DEGREES_ANGLE': np.float64}
+        'TRACK_ID':         np.uint32,
+        'POSITION_T':       np.uint32,
+        'POSITION_X':       np.float64,
+        'POSITION_Y':       np.float64,
+        'WIDTH':            np.float64,
+        'HEIGHT':           np.float64,
+        'DEGREES_ANGLE':    np.float64,
+    }
 
     :param csv_file_path: csv file to read
     :param dtype: dict of columns to be loaded and their data types
@@ -877,7 +878,7 @@ def get_data(csv_file_path, dtype=None, check_sorted=True):
             'POSITION_Y': np.float64,
             'WIDTH': np.float64,
             'HEIGHT': np.float64,
-            'DEGREES_ANGLE': np.float64
+            'DEGREES_ANGLE': np.float64,
         }
     use_cols = list(dtype.keys())
     try:
@@ -904,6 +905,9 @@ def get_data(csv_file_path, dtype=None, check_sorted=True):
         if series_check_sorted.is_unique:
             logger.info('The data frame seems not to be sorted by \'TRACK_ID\' and \'POSITION_T\', sorting now.')
             df = sort_list(df=df, save_file=False)
+            if df is None:
+                logger.warning('No Dataframe returned')
+                return None
     logger.debug('Done reading {} into data frame'.format(csv_file_path))
     return df
 
@@ -1335,6 +1339,22 @@ def reshape_result(tuple_of_tuples, *args):
     return tuple(coordinates), additional_info
 
 
+def rollavg_pandas(a, n):
+    """ Rolling moving average with window length n
+    https://stackoverflow.com/questions/14313510/how-to-calculate-rolling-moving-average-using-numpy-scipy
+
+    :param a: Input array, list or similar with length x
+    :type a: list, 1d array, series
+    :param n: window length of roling moving average
+    :type n: int
+    :return: Output array, list or similar with length x
+    :rtype: np.array
+    """
+    assert isinstance(n, int)
+    assert n > 0
+    return pd.DataFrame(a).rolling(n, center=True, min_periods=1).mean().to_numpy().flatten()
+
+
 def save_df_to_csv(df, save_path, rename_old_file=True):
     """save data frame to csv file
 
@@ -1509,6 +1529,8 @@ def shift_np_array(arr, shift, fill_value=np.nan):
 
 def sort_list(file_path=None, sort=None, df=None, save_file=False):
     """sorts pandas data frame, optionally saves it and loads it from csv
+    Default sort:
+    sort = ['TRACK_ID', 'POSITION_T']
 
     :param file_path: file path to save .csv to
     :param sort: list of columns to sort by, defaults to ['TRACK_ID', 'POSITION_T']
@@ -1525,6 +1547,9 @@ def sort_list(file_path=None, sort=None, df=None, save_file=False):
         sort = [sort]
     if file_path is not None and df is None:
         df = get_data(file_path, check_sorted=False)  # get data frame from .csv
+    if df is None:
+        logger.warning('No Dataframe read')
+        return None
     try:
         df.sort_values(by=sort, inplace=True, na_position='first')  # Sort data frame
         df.reset_index(drop=True, inplace=True)  # reset index of df

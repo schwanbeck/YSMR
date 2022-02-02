@@ -431,16 +431,17 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary, fra
     # avoid off-by-one error; used instead of df.shape[0] to avoid impossible calls to df.iloc[:]
     '''
     # kick_reason:
-    7: size < 600 
-    6: holes > 6  (not used, as larger track halve will be re-analysed)
-    5: distance outlier
-    4: duration*1.05 > size
-    3: average area not within bounds
-    2: average ratio not within bounds
-    1: average x/y not within bounds
+    8: size < 600 
+    7: holes > 6  (not used, as larger track halve will be re-analysed)
+    6: distance outlier
+    5: duration*1.05 > size
+    4: average area not within bounds
+    3: average ratio not within bounds
+    2: average x/y not within bounds
+    1: min/max xy not within screen
     0: pass
     '''
-    kick_reason = 7
+    kick_reason = 8
     return_result = []
     sub_part = []
     # Too short tracks aren't useful and can immediately be discarded
@@ -479,8 +480,13 @@ def find_good_tracks(df_passed, start, stop, lower_boundary, upper_boundary, fra
                                         < df['POSITION_X'].mean()
                                         < (1 - settings['percent of screen edges to exclude']) * frame_width):
                                     kick_reason -= 1
-                                    # everything is as it should be, append start/stop to return_result
-                                    return_result.append((start, stop))
+                                    # GSFF can project pos. outside of frame at times:
+                                    if settings['percent of screen edges to exclude'] == 0 or not (
+                                            df['POSITION_X'].min() < 0 or df['POSITION_X'].max() > frame_width or
+                                            df['POSITION_Y'].min() < 0 or df['POSITION_Y'].max() > frame_height):
+                                        kick_reason -= 1
+                                        # everything is as it should be, append start/stop to return_result
+                                        return_result.append((start, stop))
             # Split track into part before/after outlier; try to analyze those instead; extend return_result
             else:
                 # Hole is index where distance_outlier == 1; hole is excluded
@@ -616,7 +622,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     if settings['verbose']:
         logger.debug('Starting to set NaNs')
     # Remove rough outliers
-    df['average_area'] = df.groupby('TRACK_ID')['area'].transform('mean')
+    df['average_area'] = df.groupby('TRACK_ID')['area'].transform('median')
     df['area'] = np.where(
         (df['average_area'] >= settings['extreme area outliers lower end in px*px']) &
         (df['average_area'] <= settings['extreme area outliers upper end in px*px']),
@@ -644,6 +650,15 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         df['area'],  # track is fine
         np.NaN  # delete otherwise
     )
+
+    # Remove frames where GSFF predicted bacterium to be outside of frame
+    # df['area'] = np.where(
+    #     (0 <= df['POSITION_X'] <= frame_width) &
+    #     (0 <= df['POSITION_Y'] <= frame_height),
+    #     df['area'],  # track is fine
+    #     np.NaN  # delete otherwise
+    # )
+    # -> moved to select_tracks()
 
     # remove all rows with a NaN in them - this gets rid of empty/short tracks and empty/suspect measurements
     # As we'll later need only the remaining areas, we'll drop the NaNs
@@ -720,7 +735,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         logger.debug('Starting with fine selection')
 
     # So we can later see why tracks were removed
-    kick_reasons = [0 for _ in range(8)]
+    kick_reasons = [0 for _ in range(9)]
 
     # create a list of all tracks that match our selection criteria
     good_track = []
@@ -772,20 +787,23 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     logger.info('All tracks before fine selection: {}, left over: {}, difference: {}'.format(
         len(track_change), len(good_track), (len(track_change) - len(good_track))))
     '''
-    # kick_reason: 
-    7 size < 600
-    6 holes > 6
-    5 distance outlier
-    4 duration*1.05 > size
-    3 average area not within bounds
-    2 average ratio not within bounds
-    1 average x/y not within bounds
-    0 pass
-    '''
-    kick_reasons_string = 'Total: {8}; size < 600: {7}; holes > 6: {6}; ' \
-                          'distance outlier: {5}; duration 5% over size: {4}; ' \
-                          'area out of bounds: {3}; ratio wrong: {2}; ' \
-                          'screen edge: {1}; passed: {0}'.format(*kick_reasons, sum(kick_reasons))
+     # kick_reason:
+     8: size < 600 
+     7: holes > 6  (not used, as larger track halve will be re-analysed)
+     6: distance outlier
+     5: duration*1.05 > size
+     4: average area not within bounds
+     3: average ratio not within bounds
+     2: average x/y not within bounds
+     1: min/max xy not within screen
+     0: pass
+     '''
+    kick_reasons_string = 'Total: {9}; size < 600: {8}; holes > 6: {7}; ' \
+                          'distance outlier: {6}; duration 5% over size: {5}; ' \
+                          'area out of bounds: {4}; ratio wrong: {3}; ' \
+                          'average x/y not within bounds: {2}; min/max xy not within screen: {1}; ' \
+                          'passed: {0}'.format(*kick_reasons, sum(kick_reasons)
+                                               )
     if kick_reasons[0] < 1000 and kick_reasons[0] / sum(kick_reasons) < 0.3:
         logger.warning('Low amount of accepted tracks')
         logger.warning(kick_reasons_string)
@@ -906,6 +924,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df['travelled_dist'] = np.sqrt(np.square(df['x_delta']) + np.square(df['y_delta'])) / px_to_micrometre
     df['moving'] = df['travelled_dist'] / df['t_delta']
     # get rid of rounding errors, convert to binary:
+    # @todo: set higher limit when gsff is used; let user choose
     df['moving'] = np.where(df['moving'] > 10 ** -3, 1, 0).astype(np.int8)
     if int(round(fps, 0)) & 1 == 0:  # if fps is even
         max_kernel = int(round(fps, 0)) + 1
@@ -1010,6 +1029,11 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     #             )
     #         )
     time_series = df.groupby('TRACK_ID')['t_norm'].agg('last')
+
+    median_speed = pd.Series(
+        df.groupby(['TRACK_ID', df.index // fps])['travelled_dist'].sum().groupby(level=0).median(),
+        index=time_series.index
+    )
     motile_total_series = df.groupby('TRACK_ID')['moving'].agg('sum')
     motile_series = motile_total_series / (time_series + 1) * 100  # off-by-one error
     time_series = (time_series + 1) / fps  # off-by-one error
@@ -1070,24 +1094,26 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
         'Displacement divided by length',  # 8
         'Motility Phenotype',  # 9
         'TRACK_ID',  # 10
+        'Median Speed',  # 11
     ]
     # Create df for statistics
-    df_stats = pd.concat(
-        [turn_per_s_series,  # 0
-         dist_series,  # 1
-         speed_series,  # 2
-         time_series,  # 3
-         pdist_series,  # 4
-         motile_series,  # 5
-         acr_series,  # 6
-         bac_length_series,  # 7
-         displ_bac_series,  # 8
-         mot_phenotype,  # 9
-         track_id,  # 10
-         ],
+    df_stats = pd.concat([
+        turn_per_s_series,  # 0
+        dist_series,  # 1
+        speed_series,  # 2
+        time_series,  # 3
+        pdist_series,  # 4
+        motile_series,  # 5
+        acr_series,  # 6
+        bac_length_series,  # 7
+        displ_bac_series,  # 8
+        mot_phenotype,  # 9
+        track_id,  # 10
+        median_speed,  # 11
+    ],
         keys=name_of_columns, axis=1
     )
-    del turn_per_s_series, dist_series, speed_series, time_series, pdist_series, motile_series
+    del turn_per_s_series, dist_series, speed_series, time_series, pdist_series, motile_series, median_speed
 
     if settings['store generated statistical .csv file']:
         # df_stats_columns = name_of_columns
@@ -1247,6 +1273,12 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             settings['acr violin plot max'],
         ))
 
+    violin_plots.append((
+        name_of_columns[11], 'Median_speed',
+        None,
+        None,
+    ))
+
     for category, plot_name, y_min, y_max in violin_plots:
         violin_plot(
             df=df_stats_seaborne,
@@ -1323,6 +1355,8 @@ def annotate_video(video_path, df, output_save=True, settings=None, result_folde
 
         }
         df = get_data(df, dtype=dtype)
+        if df is None:
+            return None
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     (frame_height, frame_width) = (int(cap.get(4)), int(cap.get(3)))  # Image dimensions

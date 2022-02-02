@@ -98,6 +98,7 @@ class CentroidTracker:
             # for object_id in self.disappeared.keys():
             for object_id in list(self.disappeared.keys()):
                 self.disappeared[object_id] += 1
+                self.additional_info[object_id] = [0] * len(self.additional_info[object_id])
 
                 # if we have reached a maximum number of consecutive
                 # frames where a given object has been marked as
@@ -201,6 +202,7 @@ class CentroidTracker:
                         # index and increment the disappeared counter
                         object_id = object_ids[row]
                         self.disappeared[object_id] += 1
+                        self.additional_info[object_id] = [0] * len(self.additional_info[object_id])
 
                         # check to see if the number of consecutive
                         # frames the object has been marked "disappeared"
