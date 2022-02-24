@@ -209,6 +209,9 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                     markers_for_thresh,
                     mask=thresh
                 ).astype(np.uint8) * 255
+                # if settings['debugging'] and settings['display video analysis']:
+                #     display_thresh = gray[thresh]
+                #     cv2.imshow('Frame with thresholding', display_thresh)
 
         else:
             # Using average gray value of image
@@ -257,6 +260,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
 
         # display individual conversion steps to see which one acts up
         if settings['debugging'] and settings['display video analysis']:
+            cv2.imshow('{}'.format(filename_ext), frame)
             # cv2.imshow('frame', frame)
             # cv2.imshow('gray', gray)
             # cv2.imshow('equ', equ)
