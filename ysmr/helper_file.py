@@ -15,7 +15,6 @@ details. You should have received a copy of the GNU General Public License along
 not, see <http://www.gnu.org/licenses/>.
 """
 
-import collections
 import configparser
 import json
 import logging
@@ -585,7 +584,7 @@ def get_configs(tracking_ini_filepath=None):
     """
     logger = logging.getLogger('ysmr').getChild(__name__)
     settings_dict = None
-    if isinstance(tracking_ini_filepath, collections.Mapping):  # lazy check for already generated settings
+    if isinstance(tracking_ini_filepath, dict):  # check for already generated settings
         settings_dict = tracking_ini_filepath
     else:
         # if tracking_ini_filepath is not None and os.path.isfile(tracking_ini_filepath):
