@@ -344,16 +344,19 @@ def violin_plot(df, save_path, category, cut_off_category, cut_off_list, plot_ti
             curr_percentage = '{:.1%}'.format(curr_entries / all_entries)
         else:
             curr_percentage = 'error'
-        text_boxes.append((curr_category, curr_percentage, median, average))
+        text_boxes.append((curr_category, curr_entries, curr_percentage, median, average))
 
     # Create description (title) for each violin plot
-    for idx_textbox, (curr_category, curr_percentage, qm_plot, average_plot) in enumerate(text_boxes):
+    for idx_textbox, (curr_category, curr_entries, curr_percentage, qm_plot, average_plot) in enumerate(text_boxes):
         axis.text(
             idx_textbox / len(text_boxes) + 0.015, 1.005,
-            '{}: {}\nMedian: {:.2f}\nAverage:  {:.2f}'.format(
-                curr_category, curr_percentage,
+            '{}: {} ({})\nMedian: {:.2f}\nAverage:  {:.2f}'.format(
+                curr_category,
+                curr_entries,
+                curr_percentage,
                 qm_plot,
-                average_plot),
+                average_plot
+            ),
             # Set Textbox to relative position instead of absolute xy coordinates (0-1
             transform=axis.transAxes,
             size=small,

@@ -66,6 +66,9 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     except (IOError, OSError) as io_error:
         logger.exception('Cannot open file {} due to error: {}'.format(video_path, io_error))
         return None
+    except cv2.error as cv_error:
+        logger.exception('Problem opening file {} due to error: {}'.format(video_path, cv_error))
+        return None
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if frame_count < settings['minimal frame count']:
