@@ -123,7 +123,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
     error_during_read = False  # Set to true if some errors occur; used to restore old list afterwards if it exists
     (objects, degrees) = (None, None)  # reset objects, additional_info (caused errors in the past)
 
-    # Wether the result of the threshold should convert from black to white on the inverse
+    # Whether the result of the threshold should convert from black to white on the inverse
     if settings['white bacteria on dark background']:
         threshold_type = cv2.THRESH_BINARY
     else:

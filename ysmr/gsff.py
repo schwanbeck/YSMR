@@ -41,7 +41,7 @@ class GaussianSumFIR:
              [0, 1, 0, delta_time, ],
              [0, 0, 1, 0, ],
              [0, 0, 0, 1, ],
-        ], dtype=np.float)  # Equation (4)
+        ], dtype=np.float64)  # Equation (4)
 
         default for c:
         c = np.array([  # 2x4
@@ -132,7 +132,7 @@ class GaussianSumFIR:
                 [0, 1, 0, delta_time, ],
                 [0, 0, 1, 0, ],
                 [0, 0, 0, 1, ],
-            ], dtype=np.float)  # (4)
+            ], dtype=np.float64)  # (4)
         if c is None:
             c = np.array([  # 2x4
                 [1, 0, 0, 0, ],
