@@ -2,7 +2,7 @@
 #  -*- coding: utf-8 -*-
 
 """
-Copyright 2019, 2020 Jerôme Dretzke and Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
+Copyright 2019, 2020 Jerôme Dretzke and Julian Schwanbeck (schwan@umn.edu)
 https://github.com/schwanbeck/YSMR
 Original Idea and Equations from Pak, JM: Gaussian Sum FIR Filtering for 2D Target Tracking
 (DOI: 10.1007/s12555-018-0938-4)

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright 2019, 2020  Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
+Copyright 2019, 2020  Julian Schwanbeck (schwan@umn.edu)
 Original Idea by Adrian Rosebrock (adrian@pyimagesearch.com)
 https://www.pyimagesearch.com/2018/07/23/simple-object-tracking-with-opencv/
 ##Explanation

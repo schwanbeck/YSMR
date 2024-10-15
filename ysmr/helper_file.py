@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright 2019, 2020 Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
+Copyright 2019, 2020 Julian Schwanbeck (schwan@umn.edu)
 https://github.com/schwanbeck/YSMR
 ##Explanation
 This file contains various functions used by YSMR.
@@ -39,7 +39,7 @@ _config = configparser.ConfigParser(allow_no_value=True)
 def argrelextrema_groupby(group, comparator=np.greater_equal, order=10, shift_range=4, fill_value=0):
     """Find local minima/maxima in range of order (depending on comparator).
     When shift is not 0, will only return one result in range of shift.
-    Returns array with non-extrema replaced by fil_value
+    Returns array with non-extrema replaced by fill_value
 
     :param group: array like
     :param comparator: numpy comparator or equivalent
@@ -63,7 +63,8 @@ def argrelextrema_groupby(group, comparator=np.greater_equal, order=10, shift_ra
                 (query == 1),
                 0, result))
     result = np.where(result == 1, group_intermediate, fill_value)
-    result = pd.Series(result, index=group.index)
+    # @todo: check if we can skip the series conversion while using this with df .transform instead of .apply
+    result = pd.Series(result, index=group.index)  # .reindex_like(group)
     return result
 
 
@@ -1200,7 +1201,8 @@ def logging_listener(settings):
             print('Problem:', file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             try:
-                traceback.print_exc(file=settings['log file path'])
+                with open(file=settings['log file path'], mode='w+') as file:
+                    traceback.print_exc(file=file)
             except (FileNotFoundError, PermissionError):
                 pass
             break

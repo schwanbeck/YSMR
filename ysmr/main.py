@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright 2019, 2020 Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
+Copyright 2019, 2020 Julian Schwanbeck (schwan@umn.edu)
 https://github.com/schwanbeck/YSMR
 ##Explanation
 This file starts YSMR.

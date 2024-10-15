@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Copyright 2019, 2020 Julian Schwanbeck (julian.schwanbeck@med.uni-goettingen.de)
+Copyright 2019, 2020 Julian Schwanbeck (schwan@umn.edu)
 https://github.com/schwanbeck/YSMR
 ##Explanation
 This file contains the main functions used by YSMR.
@@ -288,7 +288,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
             # cv2.minAreaRect returns ((x, y), (w, h), degrees)
 
             if settings['include luminosity in tracking calculation']:
-                box = np.int0(cv2.boxPoints(reichtangle))
+                box = np.intp(cv2.boxPoints(reichtangle))
                 # must be generated for each object as cv2.fillpoly() changes it's input
                 mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
                 cv2.fillPoly(mask, [box], 255)
@@ -304,7 +304,7 @@ def track_bacteria(video_path, settings=None, result_folder=None):
                 # reshape_result(tuple_of_tuples) returns ((x, y[, *args]), (w, h, degrees_orientation))
 
             if settings['display video analysis']:  # or settings['save video']:  # Display bounding boxes
-                box = np.int0(cv2.boxPoints(reichtangle))
+                box = np.intp(cv2.boxPoints(reichtangle))
                 # Box: 4 x/y coordinates
                 cv2.drawContours(frame, [box], -1, (255, 0, 0), 0)
 
@@ -973,7 +973,9 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df['y_norm'] = (df['POSITION_Y'].sub(df.groupby('TRACK_ID')['POSITION_Y'].transform('first'))) / px_to_micrometre
 
     # get local maxima
-    df['turn_points'] = df.groupby('TRACK_ID')['turn_points'].apply(argrelextrema_groupby)
+    df['turn_points'] = df.groupby('TRACK_ID')['turn_points'].transform(
+        argrelextrema_groupby
+    )
     # Convert to binary
     df['turn_points'] = np.where(df['turn_points'] == 0, 0, 1).astype(np.int8)
     # start counts as TP so we can later group by TPs
@@ -1198,9 +1200,10 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df_stats_seaborne.dropna(subset=[cut_off_category], inplace=True)
 
     # Exchange int values in 'Categories' for correct labels
-    df_stats_seaborne[cut_off_category].replace(  # name_all_categories is not present and can be skipped
+    df_stats_seaborne[cut_off_category] = df_stats_seaborne[cut_off_category].replace(
+        # name_all_categories is not present and can be skipped
         {value: key for key, value in zip([i for (_, _, i) in cut_off_list[1:]], range(1, len(cut_off_list)))},
-        inplace=True)
+    )
 
     # Put name_all_categories and assigned categories in one df
     df_stats_seaborne = pd.concat([df_stats, df_stats_seaborne], ignore_index=True)
