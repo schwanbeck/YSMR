@@ -268,7 +268,7 @@ def ysmr(paths=None, settings=None, result_folder=None, multiprocess=False):
                     listener.join()
                     return None
                 elif event[0].lower() == 'y':
-                    logger.debug('User has given it\'s blessing.')
+                    logger.debug('User agreed.')
                     break
         results = {}
         if result_folder is None:
