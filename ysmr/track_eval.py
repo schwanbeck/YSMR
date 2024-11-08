@@ -624,8 +624,8 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     initial_length, initial_size = (len(track_change), df.shape[0])
 
     df['area'] = df['WIDTH'] * df['HEIGHT']  # calculate area of bacteria in px**2
-    # In general, area is set to np.NaN if anything is wrong, so we later only have
-    # to search for np.NaNs in one column in order to know which rows to remove
+    # In general, area is set to np.nan if anything is wrong, so we later only have
+    # to search for np.nans in one column in order to know which rows to remove
     if settings['verbose']:
         logger.debug('Starting to set NaNs')
     # Remove rough outliers
@@ -634,19 +634,19 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
         (df['average_area'] >= settings['extreme area outliers lower end in px*px']) &
         (df['average_area'] <= settings['extreme area outliers upper end in px*px']),
         df['area'],  # track is fine
-        np.NaN  # delete otherwise
+        np.nan  # delete otherwise
     )
     # Remove frames where bacterial area is x times average area
     if settings['exclude measurement when above x times average area']:
         df['area'] = np.where(
             df['area'] <= (df['average_area'] * settings['exclude measurement when above x times average area']),
             df['area'],  # track is fine
-            np.NaN  # delete otherwise
+            np.nan  # delete otherwise
         )
     # set zeroes in area to NaN
     # tracker.py sets width/height as 0 if it can't connect tracks,
     # thus every data point with area == 0 is suspect
-    df.loc[df['area'] == 0, 'area'] = np.NaN
+    df.loc[df['area'] == 0, 'area'] = np.nan
 
     # remove too short frames
     df['length'] = (df.groupby('TRACK_ID')['POSITION_T'].transform('last') -
@@ -655,7 +655,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     df['area'] = np.where(
         df['length'] >= minimal_length_frames,
         df['area'],  # track is fine
-        np.NaN  # delete otherwise
+        np.nan  # delete otherwise
     )
 
     # Remove frames where GSFF predicted bacterium to be outside of frame
@@ -663,7 +663,7 @@ def select_tracks(path_to_file=None, df=None, results_directory=None, fps=None,
     #     (0 <= df['POSITION_X'] <= frame_width) &
     #     (0 <= df['POSITION_Y'] <= frame_height),
     #     df['area'],  # track is fine
-    #     np.NaN  # delete otherwise
+    #     np.nan  # delete otherwise
     # )
     # -> moved to select_tracks()
 
@@ -1175,7 +1175,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     else:
         cut_off_precursor = [(a, b, '{:.2f} - {:.2f}'.format(a, b)) for a, b in
                              zip(cut_off_list[:-1], cut_off_list[1:])]
-    cut_off_list = [(np.NINF, np.inf, name_all_categories)]  # So one x contains all values
+    cut_off_list = [(-np.inf, np.inf, name_all_categories)]  # So one x contains all values
     cut_off_list.extend(cut_off_precursor)
 
     # Calculate df_stats_seaborne for statistical plots
@@ -1184,7 +1184,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
     df_stats_seaborne = df_stats.copy()
 
     # To drop unassigned values later
-    df_stats_seaborne[cut_off_category] = np.NaN
+    df_stats_seaborne[cut_off_category] = np.nan
     for index_cut_off, (low, high, category) in enumerate(cut_off_list):
         # Since we'll concatenate df_stats to df_stats_seaborne, which already contains all
         if category == name_all_categories:
@@ -1196,7 +1196,7 @@ def evaluate_tracks(path_to_file, results_directory, df=None, settings=None, fps
             index_cut_off,
             df_stats_seaborne[cut_off_category]
         )
-    # All np.NaN in column get replaced with str when str values are set within column -> easier to exchange later
+    # All np.nan in column get replaced with str when str values are set within column -> easier to exchange later
     df_stats_seaborne.dropna(subset=[cut_off_category], inplace=True)
 
     # Exchange int values in 'Categories' for correct labels

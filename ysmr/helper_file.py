@@ -101,7 +101,12 @@ def collate_results_csv_to_xlsx(path=None, save_path=None, csv_extension='statis
     try:
         import xlsxwriter
     except ImportError:
-        logger.warning('Could not import module \'xlsxwriter\', saving as .xlsx file is not possible.')
+        logger.warning(
+            'Could not import module \'xlsxwriter\', saving as .xlsx file is not possible.',
+            exc_info=True,
+        )
+        logger.warning('Please install xlsxwriter to save the file, or deactivate the option in tracking.ini:')
+        logger.warning('"collate results csv to xlsx = False"')
         return
     if save_path is None:
         save_path = './'
@@ -527,7 +532,9 @@ def get_any_paths(prev_dir=None, rename=False, file_types=None, settings=None):
     _config.read(settings['tracking_ini_filepath'])
 
     try:  # In case of headless or otherwise non-Tkinter cases
-        from tkinter import filedialog, Tk
+        # https://stackoverflow.com/questions/45533932/python-3-6-attributeerror-module-tkinter-has-no-attribute-filedialog/59624202#59624202
+        import tkinter.filedialog as filedialog
+        from tkinter import Tk
     except ImportError:
         logger.exception('Cannot import tkinter; files have to be specified manually.')
         return None

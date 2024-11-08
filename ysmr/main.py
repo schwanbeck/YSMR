@@ -191,6 +191,7 @@ def ysmr(paths=None, settings=None, result_folder=None, multiprocess=False):
     :return: list of (finished path, results)
     :rtype paths_finished: list
     """
+
     t_one = datetime.now()  # to get rough time estimation
     settings = get_configs(settings)  # Get settings
     if settings is None:
@@ -317,7 +318,10 @@ def ysmr(paths=None, settings=None, result_folder=None, multiprocess=False):
         else:
             logger.info('Finished with all files.')
         if settings['collate results csv to xlsx']:
-            collate_results_csv_to_xlsx(path=result_folder, save_path=result_folder)  # folder_path
+            try:
+                collate_results_csv_to_xlsx(path=result_folder, save_path=result_folder)  # folder_path
+            finally:
+                pass
 
     if settings['shut down after analysis']:
         shutdown()
